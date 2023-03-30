@@ -1,0 +1,10 @@
+<package format="2">
+    <name>line_planner</name>
+    <version>0.0.1</version>
+    <description>The line_planner package</description>
+    <maintainer email="your@email.com">Your Name</maintainer>
+    <license>MIT</license>
+    <buildtool_depend>catkin</buildtool_depend>
+    <depend>rospy</depend>
+    <depend>dynamic_reconfigure</depend>
+</package>
