@@ -2,6 +2,9 @@
 
     <node name="line_planner" pkg="line_planner" type="line_planner_node.py" output="screen">
 
+        <param name="robot_frame" value="base_link"/>
+        <param name="planning_frame" value="map"/>
+
         <param name="publish_debug_markers" value="true"/>
 
         <param name="max_turning_velocity" value="0.9"/>
@@ -13,9 +16,6 @@
         <param name="min_project_dist" value="0.25"/>
         <param name="max_project_dist" value="2.0"/>
 
-        <param name="robot_frame" value="base_link"/>
-        <param name="planning_frame" value="odom"/>
-
         <!-- Distance at which the goal is considered reached.-->
         <param name="goal_distance_threshold" value="1.0"/>
 
@@ -23,6 +23,9 @@
         <param name="P" value="3.0"/>
         <param name="I" value="0.001"/>
         <param name="D" value="65.0"/>
+
+        <!-- If the robot frame is away from the line, the goal will be mirrored into the opposite direction and multiplied with this value.-->
+        <param name="side_offset_mult" value="0.5"/>
 
         <!-- Update rate, should be about the same as localization rate.-->
         <param name="rate" value="30"/>
