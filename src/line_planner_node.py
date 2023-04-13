@@ -9,7 +9,7 @@ from projector import *
 
 from geometry_msgs.msg import Twist, Point
 from visualization_msgs.msg import Marker, MarkerArray
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from move_base_msgs.msg import MoveBaseAction
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Empty
 
@@ -18,22 +18,20 @@ from tf2_geometry_msgs import do_transform_pose
 
 from actionlib import SimpleActionServer
 from dynamic_reconfigure.server import Server as DynamicReconfigureServer
+
 from line_planner.cfg import LinePlannerConfig
+from line_planner.msg import MoveBaseRouteAction, MoveBaseRouteFeedback
 
 ROBOT_FRAME = "base_link"
 PLANNING_FRAME = "map"
 
-class PathServer:
-	def __init__(self, tf2_buffer, active_server_callback=None):
-		self.tf2_buffer = tf2_buffer
+class GoalServer:
 
-class ActionGoalServer:
 	def __init__(self, tf2_buffer, active_server_callback=None):
 		self.start_goal = None
 		self.end_goal = None
 		self.tf2_buffer = tf2_buffer
 		self.active_server_callback = active_server_callback
-		self.action_server = SimpleActionServer('move_base', MoveBaseAction, execute_cb=self.goal_callback, auto_start=True)
 
 	def get_goals(self):
 		return self.start_goal, self.end_goal
@@ -50,81 +48,115 @@ class ActionGoalServer:
 		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 			rospy.logwarn("TF2 exception: %s", e)
 
-	def goal_callback(self, goal):
-
-		print(goal)
-
-""" 		if PLANNING_FRAME == goal.header.frame_id:
-			rospy.loginfo("------------------")
-			rospy.loginfo("Received simple goal in planning ("+PLANNING_FRAME+") frame.")
-			rospy.loginfo("Position: X: %f, Y: %f, Z: %f", goal.pose.position.x, goal.pose.position.y, goal.pose.position.z)
-			rospy.loginfo("Orientation: X: %f, Y: %f, Z: %f, W: %f", goal.pose.orientation.x, goal.pose.orientation.y, goal.pose.orientation.z, goal.pose.orientation.w)
-			self.set_goal_pair(goal.pose)
-		else:
-			try:
-				transform = self.tf2_buffer.lookup_transform(PLANNING_FRAME, goal.header.frame_id, goal.header.stamp, rospy.Duration(1.0))
-				goal_transformed = do_transform_pose(goal, transform)
-				self.set_goal_pair(goal_transformed.pose)
-				rospy.loginfo("------------------")
-				rospy.loginfo("Received simple goal in "+goal.header.frame_id+" frame, transformed to "+PLANNING_FRAME+".")
-				rospy.loginfo("Position: X: %f, Y: %f, Z: %f", goal_transformed.pose.position.x, goal_transformed.pose.position.y, goal_transformed.pose.position.z)
-				rospy.loginfo("Orientation: X: %f, Y: %f, Z: %f, W: %f", goal_transformed.pose.orientation.x, goal_transformed.pose.orientation.y, goal_transformed.pose.orientation.z, goal_transformed.pose.orientation.w)
-
-			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-				rospy.logwarn("TF2 exception: %s", e)
-				return """
-
-class SimpleGoalServer:
-	def __init__(self, tf2_buffer, active_server_callback=None):
-		self.start_goal = None
-		self.end_goal = None
-		self.tf2_buffer = tf2_buffer
-		self.active_server_callback = active_server_callback
-
-		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
-		self.clear_goals_sub = rospy.Subscriber("/move_base_simple/clear", Empty, self.clear_callback)
-
-	def get_goals(self):
-		return self.start_goal, self.end_goal
-	
-	def goal_reached(self):
-		self.start_goal = None
-		self.end_goal = None
-
-	def set_goal_pair(self, endgoal):
-		try:
-			self.start_goal = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
-			self.end_goal = endgoal
-			self.active_server_callback(self)
-		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-			rospy.logwarn("TF2 exception: %s", e)
-
-	def goal_callback(self, goal):
-
+	def process_goal(self, goal):
 		if PLANNING_FRAME == goal.header.frame_id:
 			rospy.loginfo("------------------")
-			rospy.loginfo("Received simple goal in planning ("+PLANNING_FRAME+") frame.")
+			rospy.loginfo("Received goal in planning ("+PLANNING_FRAME+") frame.")
 			rospy.loginfo("Position: X: %f, Y: %f, Z: %f", goal.pose.position.x, goal.pose.position.y, goal.pose.position.z)
 			rospy.loginfo("Orientation: X: %f, Y: %f, Z: %f, W: %f", goal.pose.orientation.x, goal.pose.orientation.y, goal.pose.orientation.z, goal.pose.orientation.w)
 			self.set_goal_pair(goal.pose)
 		else:
-
 			try:
 				transform = self.tf2_buffer.lookup_transform(PLANNING_FRAME, goal.header.frame_id, goal.header.stamp, rospy.Duration(1.0))
 				goal_transformed = do_transform_pose(goal, transform)
 				self.set_goal_pair(goal_transformed.pose)
 				rospy.loginfo("------------------")
-				rospy.loginfo("Received simple goal in "+goal.header.frame_id+" frame, transformed to "+PLANNING_FRAME+".")
+				rospy.loginfo("Received goal in "+goal.header.frame_id+" frame, transformed to "+PLANNING_FRAME+".")
 				rospy.loginfo("Position: X: %f, Y: %f, Z: %f", goal_transformed.pose.position.x, goal_transformed.pose.position.y, goal_transformed.pose.position.z)
 				rospy.loginfo("Orientation: X: %f, Y: %f, Z: %f, W: %f", goal_transformed.pose.orientation.x, goal_transformed.pose.orientation.y, goal_transformed.pose.orientation.z, goal_transformed.pose.orientation.w)
 
 			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 				rospy.logwarn("TF2 exception: %s", e)
-				return
+				return  
+			
+
+class PathGoalServer(GoalServer):
+	def __init__(self, tf2_buffer, active_server_callback=None):
+		super().__init__(tf2_buffer, active_server_callback)
+		self.action_server = SimpleActionServer('move_base_route', MoveBaseRouteAction, execute_cb=self.action_route_callback, auto_start=True)
+
+		self.route = []
+		self.route_index = 0
+
+	def set_goal_pair(self, endgoal):
+
+		if self.route_index == 0:
+			super().set_goal_pair(endgoal)
+		else:
+			self.start_goal = self.route[self.route_index-1].pose
+			self.end_goal = self.route[self.route_index].pose
+			self.active_server_callback(self)
+
+	def goal_reached(self):
+		rospy.loginfo("Goal #%i reached.",self.route_index)
+
+		if self.route_index < len(self.route)-1:
+			self.route_index +=1
+			self.process_goal(self.route[self.route_index])
+		else:
+			rospy.loginfo("-> Route finished.")
+			self.start_goal = None
+			self.end_goal = None
+			self.action_server.set_succeeded()
 
 	def clear_callback(self, msg):
 		self.start_goal = None
 		self.end_goal = None
+		self.route = []
+		self.route_index = 0
+		self.action_server.set_aborted()
+
+	def action_route_callback(self, msg):
+
+		rospy.loginfo("New route received.")
+
+		self.route = msg.goal_poses
+		self.route_index = 0
+		self.process_goal(self.route[self.route_index])
+			
+		while (self.start_goal != None or self.end_goal != None) and not rospy.is_shutdown():
+
+			if self.action_server.is_preempt_requested():
+				rospy.loginfo("Preempting the route.")
+				self.action_server.set_preempted()
+				return
+
+			rospy.sleep(0.1)
+
+
+class ActionGoalServer(GoalServer):
+	def __init__(self, tf2_buffer, active_server_callback=None):
+		super().__init__(tf2_buffer, active_server_callback)
+		self.action_server = SimpleActionServer('move_base', MoveBaseAction, execute_cb=self.action_goal_callback, auto_start=True)
+
+		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
+		self.clear_goals_sub = rospy.Subscriber("/move_base_simple/clear", Empty, self.clear_callback)
+	
+	def goal_reached(self):
+		self.start_goal = None
+		self.end_goal = None
+		self.action_server.set_succeeded()
+
+	def clear_callback(self, msg):
+		self.start_goal = None
+		self.end_goal = None
+		self.action_server.set_aborted()
+
+	def goal_callback(self, goal):
+		self.process_goal(goal)
+
+	def action_goal_callback(self, msg):
+
+		self.process_goal(msg.target_pose)
+		
+		while (self.start_goal != None or self.end_goal != None) and not rospy.is_shutdown():
+
+			if self.action_server.is_preempt_requested():
+				rospy.loginfo("Preempting the current goal.")
+				self.action_server.set_preempted()
+				return
+
+			rospy.sleep(0.1)
 
 class LineFollowingController:
 	def __init__(self):
@@ -134,7 +166,6 @@ class LineFollowingController:
 		ROBOT_FRAME = rospy.get_param('robot_frame', 'base_link')
 		PLANNING_FRAME = rospy.get_param('planning_frame', 'map')
 		
-		self.ABORT_TIMEOUT = rospy.get_param('abort_timeout', 30.0)
 		self.MIN_GOAL_DIST = rospy.get_param('goal_distance_threshold', 0.6)
 
 		self.MAX_ANGULAR_SPD = rospy.get_param('max_turning_velocity', 0.9)
@@ -157,6 +188,7 @@ class LineFollowingController:
 		self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
 
 		self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
+		
 		self.marker_pub = rospy.Publisher("goal_markers", MarkerArray, queue_size=1)
 
 		self.pid = PID(
@@ -166,9 +198,8 @@ class LineFollowingController:
 		)
 
 		self.active_server = None
-		self.simple_server = SimpleGoalServer(self.tf2_buffer, self.set_active_server)
-		#self.actiongoal_server = ActionGoalServer(self.set_active_server)
-		#self.path_server = PathServer(self.set_active_server)
+		self.actiongoal_server = ActionGoalServer(self.tf2_buffer, self.set_active_server)
+		self.path_server = PathGoalServer(self.tf2_buffer, self.set_active_server)
 
 		self.reconfigure_server = DynamicReconfigureServer(LinePlannerConfig, self.dynamic_reconfigure_callback)
 
@@ -186,7 +217,6 @@ class LineFollowingController:
 		self.pid.ki = config.I
 		self.pid.kd = config.D
 
-		self.ABORT_TIMEOUT = config.abort_timeout
 		self.MIN_GOAL_DIST = config.goal_distance_threshold
 
 		self.MAX_ANGULAR_SPD = config.max_turning_velocity
@@ -233,6 +263,7 @@ class LineFollowingController:
 
 		if start_goal == None or end_goal == None:
 			self.active_server = None
+			self.send_twist(0, 0)
 			if self.DEBUG_MARKERS:
 				self.delete_debug_markers()
 			return
@@ -290,12 +321,6 @@ class LineFollowingController:
 		self.marker_pub.publish(markerArray)
 
 	def draw_debug_markers(self, target_position, start_goal, end_goal):
-
-		def delete_marker(marker_id):
-			marker = Marker()
-			marker.action = 2
-			marker.id = marker_id
-			return marker
 		
 		def set_marker(position, marker_id, r, g, b, size):
 			marker = Marker()

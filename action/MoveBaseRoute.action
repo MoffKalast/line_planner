@@ -1,0 +1,10 @@
+ # Define the goals
+geometry_msgs/PoseStamped[] goal_poses
+---
+# Define the result
+uint8 result_status
+string result_text
+---
+# Define the feedback
+uint8 current_goal_index
+float32 distance_to_current_goal
