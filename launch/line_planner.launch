@@ -8,7 +8,11 @@
         <param name="publish_debug_markers" value="true"/>
 
         <param name="max_turning_velocity" value="0.9"/>
+
+        <param name="linear_acceleration" value="0.05"/>
+        <param name="min_linear_velocity" value="0.15"/>
         <param name="max_linear_velocity" value="0.45"/>
+        
 
         <!-- If base_link is this far away from the line, the projected distance will be min and scale to max when it's on the line.-->
         <param name="max_line_divergence" value="1.5"/>
@@ -18,6 +22,8 @@
 
         <!-- Distance at which the goal is considered reached.-->
         <param name="goal_distance_threshold" value="1.0"/>
+
+        <param name="flip_angular_when_reversing" value="true"/>
 
         <!-- PID params for heading control.-->
         <param name="P" value="3.0"/>

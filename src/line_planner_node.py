@@ -11,7 +11,7 @@ from geometry_msgs.msg import Twist, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from move_base_msgs.msg import MoveBaseAction
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, ColorRGBA
 
 from tf.transformations import euler_from_quaternion
 from tf2_geometry_msgs import do_transform_pose
@@ -169,6 +169,9 @@ class LineFollowingController:
 		self.MIN_GOAL_DIST = rospy.get_param('goal_distance_threshold', 0.6)
 
 		self.MAX_ANGULAR_SPD = rospy.get_param('max_turning_velocity', 0.9)
+
+		self.LINEAR_ACCEL = rospy.get_param('linear_acceleration', 0.1)
+		self.MIN_LINEAR_SPD = rospy.get_param('min_linear_velocity', 0.1)
 		self.MAX_LINEAR_SPD = rospy.get_param('max_linear_velocity', 0.45)
 
 		self.LINE_DIVERGENCE = rospy.get_param('max_line_divergence', 1.0)
@@ -177,10 +180,8 @@ class LineFollowingController:
 
 		self.SIDE_OFFSET_MULT = rospy.get_param('side_offset_mult', 0.5)
 
-		self.ROBOT_FRAME = rospy.get_param('robot_frame', 'base_link')
-		self.PLANNING_FRAME = rospy.get_param('planning_frame', 'map')
-
 		self.DEBUG_MARKERS = rospy.get_param('publish_debug_markers', True)
+		self.FLIP_ANGULAR = rospy.get_param('flip_angular_when_reversing', True)
 
 		self.tf_listener = tf.TransformListener()
 
@@ -219,6 +220,9 @@ class LineFollowingController:
 
 		self.MIN_GOAL_DIST = config.goal_distance_threshold
 
+		self.LINEAR_ACCEL = config.linear_acceleration
+		self.MAX_LINEAR_SPD = config.max_linear_velocity
+
 		self.MAX_ANGULAR_SPD = config.max_turning_velocity
 		self.MAX_LINEAR_SPD = config.max_linear_velocity
 
@@ -254,11 +258,27 @@ class LineFollowingController:
 		deltay = goal.position.y - pose.position.y
 		return math.sqrt(deltax** 2 + deltay ** 2)
 
+	def get_linear_velocity(self, distance, angle_error):
+		vel = self.MAX_LINEAR_SPD
+
+		# check for correct orientation
+		abserr = math.fabs(angle_error)
+
+		if abserr > 2.0:
+			vel *= clamp(-1.598 * abserr + 3.196, -1.0, 0.0) # gradually reverse from 120 to 180 deg heading
+			return clamp(vel, -self.MAX_LINEAR_SPD, 0.0)
+		
+		if abserr > 0.52:
+			vel *= clamp((-1.0 / 0.52) * abserr + 2, 0.0, 1.0) # gradually decrease velocity from 30 to 60 deg heading
+		
+		return clamp(vel, 0.0, self.MAX_LINEAR_SPD)
+
+
 	def update(self):
 
 		if self.active_server == None:
 			return
-		
+				
 		start_goal, end_goal = self.active_server.get_goals()
 
 		if start_goal == None or end_goal == None:
@@ -286,7 +306,11 @@ class LineFollowingController:
 			target_distance = self.get_distance(end_goal, pose)
 
 			if target_distance > self.MIN_GOAL_DIST:
-				linear_velocity = clamp((self.MAX_LINEAR_SPD+0.1) - math.fabs(angle_error) * self.MAX_LINEAR_SPD * 0.65, 0.0, self.MAX_LINEAR_SPD)
+				linear_velocity = self.get_linear_velocity(target_distance, angle_error)
+
+				if linear_velocity < 0 and self.FLIP_ANGULAR:
+					angular_velocity = -angular_velocity
+
 			else:
 				linear_velocity = 0
 				angular_velocity = 0
@@ -308,25 +332,21 @@ class LineFollowingController:
 
 	def delete_debug_markers(self):
 
-		def delete_marker(marker_id):
-			marker = Marker()
-			marker.action = 2
-			marker.id = marker_id
-			return marker
+		marker = Marker()
+		marker.action = 3
 
 		markerArray = MarkerArray()
-		markerArray.markers.append(delete_marker(0))
-		markerArray.markers.append(delete_marker(1))
-		markerArray.markers.append(delete_marker(2))
+		markerArray.markers.append(marker)
 		self.marker_pub.publish(markerArray)
 
 	def draw_debug_markers(self, target_position, start_goal, end_goal):
 		
-		def set_marker(position, marker_id, r, g, b, size):
+		def sphere_marker(position, marker_id, r, g, b, size):
 			marker = Marker()
-			marker.header.frame_id = self.PLANNING_FRAME
-			marker.type = marker.SPHERE
+			marker.header.frame_id = PLANNING_FRAME
+			marker.type = Marker.SPHERE
 			marker.pose.position = position
+			marker.pose.orientation.w = 1.0
 			marker.scale.x = size
 			marker.scale.y = size
 			marker.scale.z = size
@@ -336,13 +356,33 @@ class LineFollowingController:
 			marker.color.b = b
 			marker.id = marker_id
 			return marker
+		
+		def line_marker(p_from, p_to, marker_id, r, g, b):
+			marker = Marker()
+			marker.header.frame_id = PLANNING_FRAME
+			marker.type = Marker.LINE_STRIP
+			marker.pose.orientation.w = 1.0
+
+			marker.points = [
+				Point(p_from.x, p_from.y, p_from.z),
+				Point(p_to.x, p_to.y, p_to.z),
+			]
+
+			c = ColorRGBA(r,g,b, 1.0)
+
+			marker.colors = [c, c]
+
+			marker.scale.x = 0.05
+			marker.id = marker_id
+			return marker
 
 		# to avoid flooding
 		if self.marker_publish_skip == 0:
 			markerArray = MarkerArray()
-			markerArray.markers.append(set_marker(start_goal.position, 0, 1.0, 0.0, 0.0, self.MIN_GOAL_DIST))
-			markerArray.markers.append(set_marker(end_goal.position, 1, 0.0, 0.0, 1.0, self.MIN_GOAL_DIST))
-			markerArray.markers.append(set_marker(target_position, 2, 0.0, 1.0, 0.0, 0.25))
+			markerArray.markers.append(line_marker(start_goal.position, end_goal.position, 0, 0.5, 0.5, 0.5))
+			markerArray.markers.append(sphere_marker(start_goal.position, 1, 1.0, 0.0, 0.0, 0.2))
+			markerArray.markers.append(sphere_marker(end_goal.position, 2, 0.0, 0.0, 1.0, self.MIN_GOAL_DIST*2))
+			markerArray.markers.append(sphere_marker(target_position, 3, 0.0, 1.0, 0.0, 0.2))
 			self.marker_pub.publish(markerArray)
 		
 		self.marker_publish_skip = (self.marker_publish_skip +1)%5
@@ -355,4 +395,5 @@ rate = rospy.Rate(rospy.get_param('rate', 30))
 while not rospy.is_shutdown():
 	ctrl.update()
 	rate.sleep()
+	
 	
