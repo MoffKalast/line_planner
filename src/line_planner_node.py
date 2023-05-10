@@ -9,44 +9,88 @@ from projector import *
 
 from geometry_msgs.msg import Twist, Point
 from visualization_msgs.msg import Marker, MarkerArray
-from move_base_msgs.msg import MoveBaseAction
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Empty, ColorRGBA
 
 from tf.transformations import euler_from_quaternion
 from tf2_geometry_msgs import do_transform_pose
 
-from actionlib import SimpleActionServer
 from dynamic_reconfigure.server import Server as DynamicReconfigureServer
 
 from line_planner.cfg import LinePlannerConfig
-from line_planner.msg import MoveBaseRouteAction, MoveBaseRouteFeedback
+from nav_msgs.msg import Path
 
 ROBOT_FRAME = "base_link"
 PLANNING_FRAME = "map"
 
 class GoalServer:
 
-	def __init__(self, tf2_buffer, active_server_callback=None):
+	def __init__(self, tf2_buffer):
 		self.start_goal = None
 		self.end_goal = None
 		self.tf2_buffer = tf2_buffer
-		self.active_server_callback = active_server_callback
+
+		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/waypoints", Path, self.route_callback)
+		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
+		self.clear_goals_sub = rospy.Subscriber("/move_base_simple/clear", Empty, self.reset)
+
+		self.start_goal = None
+		self.end_goal = None
+		self.route = []
+		self.route_index = 0
+
+	def reset(self):
+		self.start_goal = None
+		self.end_goal = None
+		self.route = []
+		self.route_index = 0
+
+	def goal_callback(self, goal):
+		self.route = []
+		self.route_index = 0
+		self.process_goal(goal)
+
+	def route_callback(self, msg):
+		rospy.loginfo("New route received.")
+
+		if len(msg.poses) == 0:
+			rospy.loginfo("Empty route, stopping.")
+			self.reset()
+			return
+
+		self.route = msg.poses
+		self.route_index = 0
+		self.process_goal(self.route[0])
 
 	def get_goals(self):
 		return self.start_goal, self.end_goal
 	
 	def goal_reached(self):
-		self.start_goal = None
-		self.end_goal = None
+		if len(self.route) > 0:
+			rospy.loginfo("Goal #%i reached.",self.route_index)
+			if self.route_index < len(self.route)-1:
+				self.route_index +=1
+				self.process_goal(self.route[self.route_index])
+			else:
+				rospy.loginfo("-> Route finished.")
+				self.start_goal = None
+				self.end_goal = None
+		else:
+			rospy.loginfo("Simple goal reached.")
+			self.start_goal = None
+			self.end_goal = None
+
 
 	def set_goal_pair(self, endgoal):
-		try:
-			self.start_goal = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
-			self.end_goal = endgoal
-			self.active_server_callback(self)
-		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-			rospy.logwarn("TF2 exception: %s", e)
+		if len(self.route) == 0 or self.route_index == 0:
+			try:
+				self.start_goal = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
+				self.end_goal = endgoal
+			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+				rospy.logwarn("TF2 exception: %s", e)
+		else:
+			self.start_goal = self.route[self.route_index-1].pose
+			self.end_goal = self.route[self.route_index].pose
 
 	def process_goal(self, goal):
 		if PLANNING_FRAME == goal.header.frame_id:
@@ -67,96 +111,7 @@ class GoalServer:
 
 			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 				rospy.logwarn("TF2 exception: %s", e)
-				return  
-			
-
-class PathGoalServer(GoalServer):
-	def __init__(self, tf2_buffer, active_server_callback=None):
-		super().__init__(tf2_buffer, active_server_callback)
-		self.action_server = SimpleActionServer('move_base_route', MoveBaseRouteAction, execute_cb=self.action_route_callback, auto_start=True)
-
-		self.route = []
-		self.route_index = 0
-
-	def set_goal_pair(self, endgoal):
-
-		if self.route_index == 0:
-			super().set_goal_pair(endgoal)
-		else:
-			self.start_goal = self.route[self.route_index-1].pose
-			self.end_goal = self.route[self.route_index].pose
-			self.active_server_callback(self)
-
-	def goal_reached(self):
-		rospy.loginfo("Goal #%i reached.",self.route_index)
-
-		if self.route_index < len(self.route)-1:
-			self.route_index +=1
-			self.process_goal(self.route[self.route_index])
-		else:
-			rospy.loginfo("-> Route finished.")
-			self.start_goal = None
-			self.end_goal = None
-			self.action_server.set_succeeded()
-
-	def clear_callback(self, msg):
-		self.start_goal = None
-		self.end_goal = None
-		self.route = []
-		self.route_index = 0
-		self.action_server.set_aborted()
-
-	def action_route_callback(self, msg):
-
-		rospy.loginfo("New route received.")
-
-		self.route = msg.goal_poses
-		self.route_index = 0
-		self.process_goal(self.route[self.route_index])
-			
-		while (self.start_goal != None or self.end_goal != None) and not rospy.is_shutdown():
-
-			if self.action_server.is_preempt_requested():
-				rospy.loginfo("Preempting the route.")
-				self.action_server.set_preempted()
 				return
-
-			rospy.sleep(0.1)
-
-
-class ActionGoalServer(GoalServer):
-	def __init__(self, tf2_buffer, active_server_callback=None):
-		super().__init__(tf2_buffer, active_server_callback)
-		self.action_server = SimpleActionServer('move_base', MoveBaseAction, execute_cb=self.action_goal_callback, auto_start=True)
-
-		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
-		self.clear_goals_sub = rospy.Subscriber("/move_base_simple/clear", Empty, self.clear_callback)
-	
-	def goal_reached(self):
-		self.start_goal = None
-		self.end_goal = None
-		self.action_server.set_succeeded()
-
-	def clear_callback(self, msg):
-		self.start_goal = None
-		self.end_goal = None
-		self.action_server.set_aborted()
-
-	def goal_callback(self, goal):
-		self.process_goal(goal)
-
-	def action_goal_callback(self, msg):
-
-		self.process_goal(msg.target_pose)
-		
-		while (self.start_goal != None or self.end_goal != None) and not rospy.is_shutdown():
-
-			if self.action_server.is_preempt_requested():
-				rospy.loginfo("Preempting the current goal.")
-				self.action_server.set_preempted()
-				return
-
-			rospy.sleep(0.1)
 
 class LineFollowingController:
 	def __init__(self):
@@ -181,7 +136,6 @@ class LineFollowingController:
 		self.SIDE_OFFSET_MULT = rospy.get_param('side_offset_mult', 0.5)
 
 		self.DEBUG_MARKERS = rospy.get_param('publish_debug_markers', True)
-		self.FLIP_ANGULAR = rospy.get_param('flip_angular_when_reversing', True)
 
 		self.tf_listener = tf.TransformListener()
 
@@ -198,9 +152,8 @@ class LineFollowingController:
 			rospy.get_param('D', 65.0)
 		)
 
-		self.active_server = None
-		self.actiongoal_server = ActionGoalServer(self.tf2_buffer, self.set_active_server)
-		self.path_server = PathGoalServer(self.tf2_buffer, self.set_active_server)
+		self.goal_server = GoalServer(self.tf2_buffer)
+		self.active = False
 
 		self.reconfigure_server = DynamicReconfigureServer(LinePlannerConfig, self.dynamic_reconfigure_callback)
 
@@ -209,9 +162,6 @@ class LineFollowingController:
 		rospy.loginfo("Line planner started.")
 		rospy.loginfo("Robot frame: "+ROBOT_FRAME)
 		rospy.loginfo("Planning frame: "+PLANNING_FRAME)
-		
-	def set_active_server(self, server):
-		self.active_server = server
 
 	def dynamic_reconfigure_callback(self, config, level):
 		self.pid.kp = config.P
@@ -275,20 +225,22 @@ class LineFollowingController:
 
 
 	def update(self):
-
-		if self.active_server == None:
-			return
 				
-		start_goal, end_goal = self.active_server.get_goals()
+		start_goal, end_goal = self.goal_server.get_goals()
 
 		if start_goal == None or end_goal == None:
-			self.active_server = None
-			self.send_twist(0, 0)
-			if self.DEBUG_MARKERS:
-				self.delete_debug_markers()
+
+			if self.active:
+				self.send_twist(0, 0)
+				if self.DEBUG_MARKERS:
+					self.delete_debug_markers()
+				self.active = False
+
 			return
 		
 		try:
+
+			self.active = True
 			pose = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
 
 			target_position = project_position(
@@ -307,14 +259,10 @@ class LineFollowingController:
 
 			if target_distance > self.MIN_GOAL_DIST:
 				linear_velocity = self.get_linear_velocity(target_distance, angle_error)
-
-				if linear_velocity < 0 and self.FLIP_ANGULAR:
-					angular_velocity = -angular_velocity
-
 			else:
 				linear_velocity = 0
 				angular_velocity = 0
-				self.active_server.goal_reached()
+				self.goal_server.goal_reached()
 
 			self.send_twist(linear_velocity, angular_velocity)
 
