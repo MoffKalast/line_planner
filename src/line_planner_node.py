@@ -24,10 +24,11 @@ PLANNING_FRAME = "map"
 
 class GoalServer:
 
-	def __init__(self, tf2_buffer):
+	def __init__(self, tf2_buffer, update_plan):
 		self.start_goal = None
 		self.end_goal = None
 		self.tf2_buffer = tf2_buffer
+		self.update_plan = update_plan
 
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/waypoints", Path, self.route_callback)
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
@@ -43,11 +44,13 @@ class GoalServer:
 		self.end_goal = None
 		self.route = []
 		self.route_index = 0
+		self.update_plan()
 
 	def goal_callback(self, goal):
 		self.route = []
 		self.route_index = 0
 		self.process_goal(goal)
+		self.update_plan()
 
 	def route_callback(self, msg):
 		rospy.loginfo("New route received.")
@@ -60,6 +63,7 @@ class GoalServer:
 		self.route = msg.poses
 		self.route_index = 0
 		self.process_goal(self.route[0])
+		self.update_plan()
 
 	def get_goals(self):
 		return self.start_goal, self.end_goal
@@ -79,6 +83,8 @@ class GoalServer:
 			self.start_goal = None
 			self.end_goal = None
 
+		self.update_plan()
+
 
 	def set_goal_pair(self, endgoal):
 		if len(self.route) == 0 or self.route_index == 0:
@@ -88,8 +94,10 @@ class GoalServer:
 			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 				rospy.logwarn("TF2 exception: %s", e)
 		else:
-			self.start_goal = self.route[self.route_index-1].pose
-			self.end_goal = self.route[self.route_index].pose
+			self.start_goal = self.end_goal
+			self.end_goal = endgoal
+
+		self.update_plan()
 
 	def process_goal(self, goal):
 		if PLANNING_FRAME == goal.header.frame_id:
@@ -152,7 +160,7 @@ class LineFollowingController:
 			rospy.get_param('D', 65.0)
 		)
 
-		self.goal_server = GoalServer(self.tf2_buffer)
+		self.goal_server = GoalServer(self.tf2_buffer, self.update_plan)
 		self.active = False
 
 		self.reconfigure_server = DynamicReconfigureServer(LinePlannerConfig, self.dynamic_reconfigure_callback)
@@ -239,10 +247,6 @@ class LineFollowingController:
 			return
 		
 		try:
-
-			if not self.active:
-				self.draw_plan()
-
 			self.active = True
 			pose = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
 
@@ -266,7 +270,6 @@ class LineFollowingController:
 				linear_velocity = 0
 				angular_velocity = 0
 				self.goal_server.goal_reached()
-				self.draw_plan()
 
 			self.send_twist(linear_velocity, angular_velocity)
 
@@ -276,9 +279,10 @@ class LineFollowingController:
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 			rospy.logwarn("TF Exception")
 
-	def draw_plan(self):
+	def update_plan(self):
 
 		msg = Path()
+		msg.header.frame_id = PLANNING_FRAME
 
 		if len(self.goal_server.route) > 1:
 			msg.poses = self.goal_server.route[self.goal_server.route_index:]
@@ -307,6 +311,10 @@ class LineFollowingController:
 		twist.linear.x = vel_x
 		twist.angular.z = vel_z
 		self.cmd_vel_pub.publish(twist)
+
+	def cleanup(self):
+		self.send_twist(0,0)
+		self.delete_debug_markers()
 
 	def delete_debug_markers(self):
 
@@ -369,9 +377,8 @@ class LineFollowingController:
 
 ctrl = LineFollowingController()
 rate = rospy.Rate(rospy.get_param('rate', 30))
+rospy.on_shutdown(ctrl.cleanup)
 
 while not rospy.is_shutdown():
 	ctrl.update()
 	rate.sleep()
-	
-	

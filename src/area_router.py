@@ -20,10 +20,10 @@ class BoundingBox3DListener:
         path.header.frame_id = "map"
         path.header.stamp = rospy.Time.now()
 
-        min_x = bbox.center.position.x - bbox.size.x / 2.0
-        max_x = bbox.center.position.x + bbox.size.x / 2.0
-        min_y = bbox.center.position.y - bbox.size.y / 2.0
-        max_y = bbox.center.position.y + bbox.size.y / 2.0
+        min_x = bbox.center.position.x - bbox.size.x
+        max_x = bbox.center.position.x + bbox.size.x
+        min_y = bbox.center.position.y - bbox.size.y
+        max_y = bbox.center.position.y + bbox.size.y
 
         x = min_x
         while x <= max_x:
