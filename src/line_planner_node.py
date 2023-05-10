@@ -5,7 +5,6 @@ import tf
 import tf2_ros
 
 from utils import *
-from projector import *
 
 from geometry_msgs.msg import Twist, Point
 from visualization_msgs.msg import Marker, MarkerArray
@@ -144,6 +143,7 @@ class LineFollowingController:
 
 		self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
 		
+		self.plan_pub = rospy.Publisher("plan", Path, queue_size=1)
 		self.marker_pub = rospy.Publisher("goal_markers", MarkerArray, queue_size=1)
 
 		self.pid = PID(
@@ -240,6 +240,9 @@ class LineFollowingController:
 		
 		try:
 
+			if not self.active:
+				self.draw_plan()
+
 			self.active = True
 			pose = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
 
@@ -263,6 +266,7 @@ class LineFollowingController:
 				linear_velocity = 0
 				angular_velocity = 0
 				self.goal_server.goal_reached()
+				self.draw_plan()
 
 			self.send_twist(linear_velocity, angular_velocity)
 
@@ -271,6 +275,32 @@ class LineFollowingController:
 
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 			rospy.logwarn("TF Exception")
+
+	def draw_plan(self):
+
+		msg = Path()
+
+		if len(self.goal_server.route) > 1:
+			msg.poses = self.goal_server.route[self.goal_server.route_index:]
+		else:
+			start_goal, end_goal = self.goal_server.get_goals()
+
+			if start_goal == None or end_goal == None:
+				self.plan_pub.publish(Path())
+				return
+
+			start_stamped = PoseStamped()
+			start_stamped.header.frame_id = PLANNING_FRAME
+			start_stamped.pose = start_goal
+			msg.poses.append(start_stamped)
+
+			end_stamped = PoseStamped()
+			end_stamped.header.frame_id = PLANNING_FRAME
+			end_stamped.pose = end_goal		
+
+			msg.poses = [start_stamped, end_stamped]
+
+		self.plan_pub.publish(msg)
 
 	def send_twist(self, vel_x, vel_z):
 		twist = Twist()
