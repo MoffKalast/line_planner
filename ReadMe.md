@@ -4,7 +4,7 @@
 
 A local planner that takes two goals (last and next), and follows a projected goal that keeps it close to the line segment between the two goals. Designed to resist strong side forces, such as from wind or water current.
 
-![demo image](demo.gif)
+![demo image](docs/demo.gif)
 
 ## Params
 
@@ -40,14 +40,50 @@ Note that min speed should be less or equal to max speed.
 
 </node>
 ```
+
+Here's a diagram showing the possible states of the planner, and which distances each parameter affects:
+
+![diagram](docs/diagram.png)
+
+
 ## Subscribed Topics
 
- - `/cmd_vel` (Twist), the velocity that needs to be muxed from linear.x and angular.z
-
- - `/diff_drive/max_speed` (Float32), wheel velocity will be capped at this value
-
- - `/diff_drive/min_speed` (Float32), non-zero messages won't go slower than this to prevent motor stall
+- `/move_base_simple/goal` (PoseStamped), takes the current position as the starting point and moves towards the goal
+- `/move_base_simple/clear` (Empty), stops all movement immediately
+- `/move_base_simple/waypoints` (Path), takes each two consecutive points and navigates along the line between them
 
 ## Published Topics
 
-- `/diff_drive` (JointState), publishes velocity for both wheels/propellers
+- `/cmd_vel` (JointState), publishes velocity for both wheels/tracks/propellers
+
+- `/plan` (Path), publishes a nav plan, also the entire route if given
+
+- `/goal_markers` (MarkerArray), publishes debug markers shown above
+
+ ## Dynamic Reconfigure Params
+
+- `publish_debug_markers` (bool_t), if set to True, the node will publish markers for debugging purposes.
+
+- `max_turning_velocity` (double_t), the maximum velocity at which the robot can turn.
+
+- `max_linear_velocity` (double_t), the maximum linear velocity of the robot.
+
+- `linear_acceleration` (double_t), the linear acceleration/deceleration of the robot.
+
+- `max_line_divergence` (double_t), the maximum distance that the robot can diverge from the line between the goals.
+
+- `min_project_dist` (double_t), the minimum projection distance for the goal.
+
+- `max_project_dist` (double_t), the maximum projection distance for the goal.
+
+- `goal_distance_threshold` (double_t), the distance at which a goal is considered reached.
+
+- `P` (double_t), the proportional gain for the PID controller that controls the heading of the robot.
+
+- `I` (double_t), the integral gain for the PID controller.
+
+- `D` (double_t), the derivative gain for the PID controller.
+
+- `side_offset_mult` (double_t), multiplier for the side projection of the robot's position.
+
+- `rate` (int_t), the rate at which the robot updates its position and velocity.
