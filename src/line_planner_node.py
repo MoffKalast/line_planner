@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from xmlrpc.client import Boolean
 import rospy
 import math
 import tf
@@ -9,7 +10,7 @@ from utils import *
 from geometry_msgs.msg import Twist, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import Empty, ColorRGBA
+from std_msgs.msg import Empty, ColorRGBA, Bool
 
 from tf.transformations import euler_from_quaternion
 from tf2_geometry_msgs import do_transform_pose
@@ -39,7 +40,7 @@ class GoalServer:
 		self.route = []
 		self.route_index = 0
 
-	def reset(self):
+	def reset(self,msg):
 		self.start_goal = None
 		self.end_goal = None
 		self.route = []
@@ -57,7 +58,7 @@ class GoalServer:
 
 		if len(msg.poses) == 0:
 			rospy.loginfo("Empty route, stopping.")
-			self.reset()
+			self.reset(None)
 			return
 
 		self.route = msg.poses
@@ -150,9 +151,10 @@ class LineFollowingController:
 		self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
 
 		self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
-		
-		self.plan_pub = rospy.Publisher("plan", Path, queue_size=1)
-		self.marker_pub = rospy.Publisher("goal_markers", MarkerArray, queue_size=1)
+
+		self.status_pub = rospy.Publisher("nav/active", Bool, queue_size=1, latch=True)
+		self.plan_pub = rospy.Publisher("nav/plan", Path, queue_size=1)
+		self.marker_pub = rospy.Publisher("nav/markers", MarkerArray, queue_size=1)
 
 		self.pid = PID(
 			rospy.get_param('P', 3.0),
@@ -166,6 +168,7 @@ class LineFollowingController:
 		self.reconfigure_server = DynamicReconfigureServer(LinePlannerConfig, self.dynamic_reconfigure_callback)
 
 		self.marker_publish_skip = 0
+		self.status_pub.publish(False)
 
 		rospy.loginfo("Line planner started.")
 		rospy.loginfo("Robot frame: "+ROBOT_FRAME)
@@ -233,7 +236,6 @@ class LineFollowingController:
 
 
 	def update(self):
-				
 		start_goal, end_goal = self.goal_server.get_goals()
 
 		if start_goal == None or end_goal == None:
@@ -243,11 +245,12 @@ class LineFollowingController:
 				if self.DEBUG_MARKERS:
 					self.delete_debug_markers()
 				self.active = False
-
+				self.status_pub.publish(False)
 			return
 		
 		try:
 			self.active = True
+			self.status_pub.publish(True)
 			pose = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
 
 			target_position = project_position(
