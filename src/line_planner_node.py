@@ -126,24 +126,24 @@ class LineFollowingController:
 		rospy.init_node("line_following_controller")
 		global ROBOT_FRAME, PLANNING_FRAME
 
-		ROBOT_FRAME = rospy.get_param('robot_frame', 'base_link')
-		PLANNING_FRAME = rospy.get_param('planning_frame', 'map')
+		ROBOT_FRAME = rospy.get_param('~robot_frame', 'base_link')
+		PLANNING_FRAME = rospy.get_param('~planning_frame', 'map')
 		
-		self.MIN_GOAL_DIST = rospy.get_param('goal_distance_threshold', 0.6)
+		self.MIN_GOAL_DIST = rospy.get_param('~goal_distance_threshold', 0.6)
 
-		self.MAX_ANGULAR_SPD = rospy.get_param('max_turning_velocity', 0.9)
+		self.MAX_ANGULAR_SPD = rospy.get_param('~max_turning_velocity', 0.9)
 
-		self.LINEAR_ACCEL = rospy.get_param('linear_acceleration', 0.1)
-		self.MIN_LINEAR_SPD = rospy.get_param('min_linear_velocity', 0.1)
+		self.LINEAR_ACCEL = rospy.get_param('~linear_acceleration', 0.1)
+		self.MIN_LINEAR_SPD = rospy.get_param('~~min_linear_velocity', 0.1)
 		self.MAX_LINEAR_SPD = rospy.get_param('max_linear_velocity', 0.45)
 
-		self.LINE_DIVERGENCE = rospy.get_param('max_line_divergence', 1.0)
-		self.MIN_PROJECT_DIST = rospy.get_param('min_project_dist', 0.15)
-		self.MAX_PROJECT_DIST = rospy.get_param('max_project_dist', 1.2)
+		self.LINE_DIVERGENCE = rospy.get_param('~max_line_divergence', 1.0)
+		self.MIN_PROJECT_DIST = rospy.get_param('~min_project_dist', 0.15)
+		self.MAX_PROJECT_DIST = rospy.get_param('~max_project_dist', 1.2)
 
-		self.SIDE_OFFSET_MULT = rospy.get_param('side_offset_mult', 0.5)
+		self.SIDE_OFFSET_MULT = rospy.get_param('~side_offset_mult', 0.5)
 
-		self.DEBUG_MARKERS = rospy.get_param('publish_debug_markers', True)
+		self.DEBUG_MARKERS = rospy.get_param('~publish_debug_markers', True)
 
 		self.tf_listener = tf.TransformListener()
 
