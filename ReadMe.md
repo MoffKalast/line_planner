@@ -49,16 +49,20 @@ Here's a diagram showing the possible states of the planner, and which distances
 ## Subscribed Topics
 
 - `/move_base_simple/goal` (PoseStamped), takes the current position as the starting point and moves towards the goal
+
 - `/move_base_simple/clear` (Empty), stops all movement immediately
+
 - `/move_base_simple/waypoints` (Path), takes each two consecutive points and navigates along the line between them
 
 ## Published Topics
 
 - `/cmd_vel` (JointState), publishes velocity for both wheels/tracks/propellers
 
-- `/plan` (Path), publishes a nav plan, also the entire route if given
+- `line_planner/active` (Bool), publishes the acitvity state of the planner
 
-- `/goal_markers` (MarkerArray), publishes debug markers shown above
+- `line_planner/plan` (Path), publishes a nav plan, also the entire route if given
+
+- `line_planner/markers` (MarkerArray), publishes debug markers shown above
 
  ## Dynamic Reconfigure Params
 

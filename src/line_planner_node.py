@@ -152,9 +152,9 @@ class LineFollowingController:
 
 		self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
 
-		self.status_pub = rospy.Publisher("nav/active", Bool, queue_size=1, latch=True)
-		self.plan_pub = rospy.Publisher("nav/plan", Path, queue_size=1, latch=True)
-		self.marker_pub = rospy.Publisher("nav/markers", MarkerArray, queue_size=1)
+		self.status_pub = rospy.Publisher("line_planner/active", Bool, queue_size=1, latch=True)
+		self.plan_pub = rospy.Publisher("line_planner/plan", Path, queue_size=1, latch=True)
+		self.marker_pub = rospy.Publisher("line_planner/markers", MarkerArray, queue_size=1)
 
 		self.pid = PID(
 			rospy.get_param('P', 3.0),
