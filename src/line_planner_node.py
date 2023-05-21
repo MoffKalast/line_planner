@@ -109,7 +109,7 @@ class GoalServer:
 			self.set_goal_pair(goal.pose)
 		else:
 			try:
-				transform = self.tf2_buffer.lookup_transform(PLANNING_FRAME, goal.header.frame_id, goal.header.stamp, rospy.Duration(1.0))
+				transform = self.tf2_buffer.lookup_transform(PLANNING_FRAME, goal.header.frame_id, rospy.Time(0))
 				goal_transformed = do_transform_pose(goal, transform)
 				self.set_goal_pair(goal_transformed.pose)
 				rospy.loginfo("------------------")
@@ -368,7 +368,7 @@ class LineFollowingController:
 		# to avoid flooding
 		if self.marker_publish_skip == 0:
 			markerArray = MarkerArray()
-			markerArray.markers.append(line_marker(start_goal.position, end_goal.position, 0, 0.5, 0.5, 0.5))
+			markerArray.markers.append(line_marker(start_goal.position, end_goal.position, 0, 0.575, 0.870, 0.0261))
 			markerArray.markers.append(sphere_marker(start_goal.position, 1, 1.0, 0.0, 0.0, 0.2))
 			markerArray.markers.append(sphere_marker(end_goal.position, 2, 0.0, 0.0, 1.0, self.MIN_GOAL_DIST*2))
 			markerArray.markers.append(sphere_marker(target_position, 3, 0.0, 1.0, 0.0, 0.2))

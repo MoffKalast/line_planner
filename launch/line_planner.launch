@@ -39,6 +39,6 @@
 
     </node>
     
-    <node name="box_path_generator" pkg="line_planner" type="area_router.py" output="screen"/>
+    <node name="area_to_path_node" pkg="line_planner" type="area_to_path.py" output="screen"/>
 
 </launch>
