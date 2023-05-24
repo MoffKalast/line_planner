@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
     rospy
     move_base_msgs
     std_msgs
+    message_generation
 )
 
 generate_dynamic_reconfigure_options(
@@ -26,9 +27,6 @@ include_directories(
 
 install(PROGRAMS
     src/line_planner_node.py
+    src/area_to_path.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(DIRECTORY config
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
