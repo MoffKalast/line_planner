@@ -91,3 +91,37 @@ Here's a diagram showing the possible states of the planner, and which distances
 - `side_offset_mult` (double_t), multiplier for the side projection of the robot's position.
 
 - `rate` (int_t), the rate at which the robot updates its position and velocity.
+
+Based on the code you've provided, here's an addition to the documentation that describes the functionality of your newly added node:
+
+---
+
+## Bounding Box to Path Helper
+
+This package also contains a small helper demo node that takes a rectangle defined as a PolygonStamped and turns it into various patterns which then get published as a Path that the line planer can execute. Right now it provides three different patterns: lawnmower, expanding square, and victor sierra. 
+
+The lawnmower pattern creates a path in a back-and-forth, or "mowing the lawn" manner. The expanding square pattern creates a square outward spiral path. The victor sierra pattern is a coast guard sector search. 
+
+it also accepts a home polygon, which it uses to add a final waypoint that points back home after following the path, so the robot doesn't get stuck out of wifi range.
+
+## Params
+
+```xml
+<node name="area_to_path_node" pkg="line_planner" type="area_to_path_node.py" output="screen">
+	<param name="step_size" value="2.0"/> <!-- determines the distance between paralel lines -->
+</node>
+```
+
+## Subscribed Topics
+
+- `/area_to_path/lawnmower` (PolygonStamped), takes a 4 vertex square and creates a lawnmower path inside it.
+
+- `/area_to_path/expanding_square` (PolygonStamped), takes a 4 vertex square and creates an expanding square (spiral) path inside it.
+
+- `/area_to_path/victor_sierra` (PolygonStamped), takes a 4 vertex square and creates a victor sierra (star) path inside it.
+
+- `/area_to_path/home` (PolygonStamped), takes a 4 vertex square and sets the center point as the home position.
+
+## Published Topics
+
+- `/move_base_simple/waypoints` (Path), publishes the created path.
