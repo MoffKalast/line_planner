@@ -1,8 +1,8 @@
 <package format="2">
     <name>line_planner</name>
     <version>0.0.1</version>
-    <description>The line_planner package</description>
-    <maintainer email="your@email.com">MoffKalast</maintainer>
+    <description>A simple planner that attempts to keep the robot close to a line between the starting and target goal.</description>
+    <maintainer email="vid.rijavec@gmail.com">MoffKalast</maintainer>
     <license>MIT</license>
 
     <depend>rospy</depend>
