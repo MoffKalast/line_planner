@@ -1,6 +1,6 @@
  # Simple Projecting Line Planner
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Build Status](https://build.ros.org/buildStatus/icon?job=Ndev__line_planner__ubuntu_focal_amd64&build=3)](https://build.ros.org/job/Ndev__line_planner__ubuntu_focal_amd64/3/)
 
 A local planner that takes two goals (last and next), and follows a projected goal that keeps it close to the line segment between the two goals. Designed to resist strong side forces, such as from wind or water current.
 
