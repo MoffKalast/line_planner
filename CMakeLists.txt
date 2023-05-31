@@ -13,10 +13,6 @@ generate_dynamic_reconfigure_options(
     config/LinePlanner.cfg
 )
 
-generate_messages(
-    DEPENDENCIES geometry_msgs move_base_msgs std_msgs
-)
-
 catkin_package(
     CATKIN_DEPENDS dynamic_reconfigure rospy geometry_msgs move_base_msgs std_msgs
 )
