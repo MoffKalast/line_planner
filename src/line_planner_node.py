@@ -134,7 +134,7 @@ class LineFollowingController:
 		self.MAX_ANGULAR_SPD = rospy.get_param('~max_turning_velocity', 0.9)
 
 		self.LINEAR_ACCEL = rospy.get_param('~linear_acceleration', 0.1)
-		self.MIN_LINEAR_SPD = rospy.get_param('~~min_linear_velocity', 0.1)
+		self.MIN_LINEAR_SPD = rospy.get_param('~min_linear_velocity', 0.1)
 		self.MAX_LINEAR_SPD = rospy.get_param('max_linear_velocity', 0.45)
 
 		self.LINE_DIVERGENCE = rospy.get_param('~max_line_divergence', 1.0)
@@ -310,6 +310,14 @@ class LineFollowingController:
 		self.plan_pub.publish(msg)
 
 	def send_twist(self, vel_x, vel_z):
+
+		#sanity check, just in case
+		if math.isnan(vel_x):
+			vel_x = 0
+
+		if math.isnan(vel_z):
+			vel_z = 0
+
 		twist = Twist()
 		twist.linear.x = vel_x
 		twist.angular.z = vel_z
