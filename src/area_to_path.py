@@ -5,25 +5,32 @@ import rospy
 import itertools
 
 from nav_msgs.msg import Path
+from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped, PolygonStamped, Point 
-
-from dynamic_reconfigure.server import Server as DynamicReconfigureServer
 
 class BoundingBox3DListener:
 	def __init__(self):
 		rospy.init_node("area_to_path_node")
 
-		self.path_pub = rospy.Publisher("/move_base_simple/waypoints", Path, queue_size=10)
+		self.path_pub = rospy.Publisher("/move_base_simple/waypoints", Path, queue_size=10, latch=True)
 
 		self.lawnmower_sub = rospy.Subscriber("/area_to_path/lawnmower", PolygonStamped, self.lawnmower_callback)
 		self.square_sub = rospy.Subscriber("/area_to_path/expanding_square", PolygonStamped, self.square_callback)
 		self.sierra_sub = rospy.Subscriber("/area_to_path/victor_sierra", PolygonStamped, self.sierra_callback)
 		self.home_sub = rospy.Subscriber("/area_to_path/home", PolygonStamped, self.home_callback)
 
+		self.planner_state_sub = rospy.Subscriber("/line_planner/active", Bool, self.planner_callback)
+
 		self.step_size = rospy.get_param("~step_size", 2.0)  # The step size (X meters) in the path
 
 		self.home_point = None
 		self.home_header = None
+
+	def planner_callback(self, msg):
+		# clear path info, since the planner has finished
+		if not msg.data:
+			path = Path()
+			self.path_pub.publish(path)
 
 	def send_path(self, header, poses):
 		if len(poses) == 0:
