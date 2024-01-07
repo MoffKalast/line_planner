@@ -3,7 +3,7 @@
     <node name="line_planner" pkg="line_planner" type="line_planner_node.py" output="screen">
 
         <param name="robot_frame" value="base_link"/>
-        <param name="planning_frame" value="map"/>
+        <param name="planning_frame" value="odom"/>
 
         <param name="publish_debug_markers" value="true"/>
 
@@ -13,7 +13,6 @@
         <param name="min_linear_velocity" value="0.15"/>
         <param name="max_linear_velocity" value="0.45"/>
         
-
         <!-- If base_link is this far away from the line, the projected distance will be min and scale to max when it's on the line.-->
         <param name="max_line_divergence" value="1.5"/>
 

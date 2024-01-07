@@ -23,6 +23,6 @@ include_directories(
 
 install(PROGRAMS
     src/line_planner_node.py
-    src/area_to_path.py
+    src/area_to_path_node.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
