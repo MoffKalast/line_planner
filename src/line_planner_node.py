@@ -47,7 +47,6 @@ class GoalServer:
 		self.route_index = 0
 
 		self.subroute = []
-
 		self.navigator = Navigator(PLANNING_FRAME, tf2_buffer, 0.5, self.obstacle_change_callback)
 
 	def reset(self, msg):
@@ -63,12 +62,20 @@ class GoalServer:
 	def obstacle_change_callback(self):
 		if self.original_start_goal is None or self.original_end_goal is None:
 			return
+		
+		try:
+			robot_pos = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
+			self.subroute = self.navigator.plan(robot_pos, robot_pos, self.original_end_goal)
 
-		self.subroute = self.navigator.plan(self.original_start_goal, self.original_end_goal)
-		self.start_goal = self.subroute[0]
-		self.end_goal = self.subroute[1]
-		self.subroute = self.subroute[1:]
-		self.update_plan()
+			self.start_goal = self.subroute[0]
+			self.end_goal = self.subroute[1]
+			self.subroute = self.subroute[1:]
+			self.update_plan()
+
+		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+			rospy.logwarn("TF2 exception: %s", e)
+			self.reset(None)
+
 
 	def goal_callback(self, goal):
 		self.route = []
@@ -124,25 +131,28 @@ class GoalServer:
 		self.update_plan()
 
 	def set_goal_pair(self, endgoal):
-		if len(self.route) == 0 or self.route_index == 0 or self.subroute:
-			try:
-				self.start_goal = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
+		try:
+			robot_pos = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
+
+			if len(self.route) == 0 or self.route_index == 0 or self.subroute:
+				self.start_goal = robot_pos
 				self.end_goal = endgoal
-			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-				rospy.logwarn("TF2 exception: %s", e)
-		else:
-			self.start_goal = self.end_goal
-			self.end_goal = endgoal
+			else:
+				self.start_goal = self.end_goal
+				self.end_goal = endgoal
 
-		self.original_start_goal = self.start_goal
-		self.original_end_goal = self.end_goal
+			self.original_start_goal = self.start_goal
+			self.original_end_goal = self.end_goal
 
-		self.subroute = self.navigator.plan(self.start_goal, self.end_goal)
-		self.start_goal = self.subroute[0]
-		self.end_goal = self.subroute[1]
-		self.subroute = self.subroute[1:]
+			self.subroute = self.navigator.plan(robot_pos, self.start_goal, self.end_goal)
+			self.start_goal = self.subroute[0]
+			self.end_goal = self.subroute[1]
+			self.subroute = self.subroute[1:]
 
-		self.update_plan()
+			self.update_plan()
+
+		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+			rospy.logwarn("TF2 exception: %s", e)
 
 	def process_goal(self, goal):
 		if PLANNING_FRAME == goal.header.frame_id:

@@ -10,14 +10,11 @@ class WishUponAStar:
 		self.obstacles = obstacles
 
 	def heuristic(self, start, goal):
-		# Using Euclidean distance squared as the heuristic function
-		dx = start[0] - goal[0]
-		dy = start[1] - goal[1]
-		return dx * dx + dy * dy
+		# Using Euclidean distance
+		return math.hypot(start[0] - goal[0],start[1] - goal[1])
 
 	def get_neighbors(self, node):
 		x, y = node
-		# Since it's an infinite grid, we consider all 8 directions
 		directions = [
 			 (x, y - 1),(x - 1, y), (x + 1, y),(x, y + 1)
 		]
@@ -96,7 +93,7 @@ class WishUponAStar:
 				if (x0, y0) in self.obstacles.entries:
 					return False
 				err -= dy
-				if err < 0:
+				if err <= 0:
 					y0 += sy
 					err += dx
 				x0 += sx
@@ -106,7 +103,7 @@ class WishUponAStar:
 				if (x0, y0) in self.obstacles.entries:
 					return False
 				err -= dx
-				if err < 0:
+				if err <= 0:
 					x0 += sx
 					err += dy
 				y0 += sy

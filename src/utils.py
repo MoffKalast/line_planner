@@ -4,6 +4,43 @@ import numpy as np
 
 from geometry_msgs.msg import Pose, Point
 
+def find_closest_segment(point, path):
+	min_distance = distance_point_to_line_segment(point, path[0], path[1])
+	closest_segment_index = 0
+
+	for i in range(1, len(path) - 1):
+		segment_start = path[i]
+		segment_end = path[i + 1]
+		distance = distance_point_to_line_segment(point, segment_start, segment_end)
+		if distance < min_distance:
+			min_distance = distance
+			closest_segment_index = i
+
+	return closest_segment_index
+
+def distance_point_to_line_segment(point, segment_start, segment_end):
+	px, py = point
+	x1, y1 = segment_start
+	x2, y2 = segment_end
+
+	dx = x2 - x1
+	dy = y2 - y1
+	length_squared = dx * dx + dy * dy
+
+	# Avoid division by zero if the line segment is a point
+	if length_squared == 0:
+		return math.sqrt((px - x1) ** 2 + (py - y1) ** 2)
+
+	t = ((px - x1) * dx + (py - y1) * dy) / length_squared
+	t = max(0, min(1, t))
+
+	closest_x = x1 + t * dx
+	closest_y = y1 + t * dy
+
+	distance_squared = (px - closest_x) ** 2 + (py - closest_y) ** 2
+
+	return math.sqrt(distance_squared)
+
 def project_position(start, end, current, mindist, maxdist, line_divergence, side_offset):
 	
 	def unit_vector(vector):

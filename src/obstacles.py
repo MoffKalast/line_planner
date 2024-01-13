@@ -4,7 +4,7 @@ import tf2_ros
 import laser_geometry
 import numpy as np
 
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Empty
 from geometry_msgs.msg import PolygonStamped, Point32, PointStamped 
 from nav_msgs.msg import GridCells
 from sensor_msgs.msg import Range
@@ -21,8 +21,10 @@ class Obstacles:
 		self.obstacle_change_callback = obstacle_change_callback
 
 		self.entries = set()
-		self.remove_sub = rospy.Subscriber('/obstacle_box/remove', PolygonStamped, self.remove_obstacle) 
-		self.add_sub = rospy.Subscriber('/obstacle_box/add', PolygonStamped, self.add_obstacle)
+		self.remove_sub = rospy.Subscriber('/obstacle_grid/remove_polygon', PolygonStamped, self.remove_obstacle) 
+		self.add_sub = rospy.Subscriber('/obstacle_grid/add_polygon', PolygonStamped, self.add_obstacle)
+		self.add_sub = rospy.Subscriber('/obstacle_grid/add_points', PolygonStamped, self.add_obstacle)
+		self.add_sub = rospy.Subscriber('/obstacle_grid/clear', Empty, self.clear_obstacles)
 		self.grid_pub = rospy.Publisher('/obstacle_grid', GridCells, queue_size=10, latch=True)
 
 		self.sonar_sub = rospy.Subscriber('/sonars', Range, self.range_callback)
@@ -31,6 +33,10 @@ class Obstacles:
 		self.laser_projector = laser_geometry.LaserProjection()
 		self.publish_grid()
 		
+	def clear_obstacles(self, msg):
+		self.entries.clear()
+		self.publish_grid()
+	
 	def obstacle_count(self):
 		return len(self.entries)
 

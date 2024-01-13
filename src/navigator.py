@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import rospy
+import math
+
+from utils import find_closest_segment
 
 from search import WishUponAStar
 from obstacles import Obstacles
@@ -40,26 +43,42 @@ class Navigator:
 		path.poses = poses
 		self.global_plan_pub.publish(path)
 
-	def plan(self, start, goal):
+	def dist(self, p1, p2):
+		return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+
+	def plan(self, robot_pos, start, goal):
 
 		if self.obstacles.obstacle_count() == 0:
 			self.publish_local_plan([])
 			return [start, goal]
 		
-		x0 = round(start.position.x / self.grid_size)
-		y0 = round(start.position.y / self.grid_size)
+		start_scaled = (start.position.x / self.grid_size, start.position.y / self.grid_size)
+		goal_scaled = (goal.position.x / self.grid_size, goal.position.y / self.grid_size)
 
-		x1 = round(goal.position.x / self.grid_size)
-		y1 = round(goal.position.y / self.grid_size)
-
-		astarpath = self.astar.search((x0,y0),(x1,y1))
+		astarpath = self.astar.search(
+			(round(start_scaled[0]), round(start_scaled[1])),
+			(round(goal_scaled[0]), round(goal_scaled[1]))
+		)
 
 		if len(astarpath) == 0:
 			self.publish_local_plan([])
 			return [start, goal]
+		
+		if robot_pos != start:
+			robot_scaled = (robot_pos.position.x / self.grid_size, robot_pos.position.y / self.grid_size)
 
-		#astarpath[0] = (start.position.x / self.grid_size, start.position.y / self.grid_size)
-		#astarpath[-1] = (goal.position.x / self.grid_size, goal.position.y / self.grid_size)
+			i = find_closest_segment(robot_scaled, astarpath)
+			astarpath = astarpath[i:]
+
+		diagonal = math.hypot(self.grid_size, self.grid_size)
+
+		print("start:",self.dist(astarpath[0], start_scaled)," end:", self.dist(astarpath[-1], goal_scaled)," dist:", diagonal)
+
+		if self.dist(astarpath[0], start_scaled) < diagonal:
+			astarpath[0] = start_scaled
+
+		if self.dist(astarpath[-1], goal_scaled) < diagonal:
+			astarpath[-1] = goal_scaled
 
 		poses = []
 		poses_stamped = []
@@ -69,3 +88,4 @@ class Navigator:
 		self.publish_local_plan(poses_stamped)
 
 		return poses
+	
