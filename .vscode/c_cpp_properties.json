@@ -1,0 +1,38 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/vid/catkin_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/vid/catkin_ws/src/dave/gazebo/dave_gazebo_model_plugins/include/**",
+        "/home/vid/catkin_ws/src/dave/gazebo/dave_gazebo_ros_plugins/include/**",
+        "/home/vid/catkin_ws/src/dave/gazebo/dave_gazebo_world_plugins/include/**",
+        "/home/vid/catkin_ws/src/ds_msgs/ds_nmea_parsers/include/**",
+        "/home/vid/catkin_ws/src/ds_msgs/ds_sensor_parsers/include/**",
+        "/home/vid/catkin_ws/src/ds_sim/include/**",
+        "/home/vid/catkin_ws/src/imc_ros_bridge/include/**",
+        "/home/vid/catkin_ws/src/nps_uw_multibeam_sonar/include/**",
+        "/home/vid/catkin_ws/src/ros_ign/ros_ign_bridge/include/**",
+        "/home/vid/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/include/**",
+        "/home/vid/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/include/**",
+        "/home/vid/catkin_ws/src/turtlebot3/turtlebot3_slam/include/**",
+        "/home/vid/catkin_ws/src/uuv_simulator/uuv_gazebo_plugins/uuv_gazebo_plugins/include/**",
+        "/home/vid/catkin_ws/src/uuv_simulator/uuv_gazebo_plugins/uuv_gazebo_ros_plugins/include/**",
+        "/home/vid/catkin_ws/src/uuv_simulator/uuv_sensor_plugins/uuv_sensor_ros_plugins/include/**",
+        "/home/vid/catkin_ws/src/uuv_simulator/uuv_world_plugins/uuv_world_plugins/include/**",
+        "/home/vid/catkin_ws/src/uuv_simulator/uuv_world_plugins/uuv_world_ros_plugins/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

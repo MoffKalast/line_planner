@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from xmlrpc.client import Boolean
 import rospy
 import math
 import tf
@@ -7,11 +6,9 @@ import tf2_ros
 
 from utils import *
 from navigator import Navigator
-from obstacles import Obstacles
 from markers import DebugMarkers
 
-from geometry_msgs.msg import Twist
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Twist, PoseStamped
 from std_msgs.msg import Empty, Bool
 
 from tf.transformations import euler_from_quaternion
@@ -329,7 +326,7 @@ class LineFollowingController:
 			self.send_twist(linear_velocity, angular_velocity)
 
 			if self.DEBUG_MARKERS:
-				self.markers.draw_debug_markers(target_position, start_goal, end_goal, self.MIN_GOAL_DIST)
+				self.markers.draw_debug_markers(target_position, start_goal, end_goal, self.MIN_GOAL_DIST, self.LINE_DIVERGENCE)
 
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 			rospy.logwarn("TF Exception")
