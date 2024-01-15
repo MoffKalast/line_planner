@@ -118,12 +118,10 @@ class GoalServer:
 				self.process_goal(self.route[self.route_index])
 			else:
 				rospy.loginfo("-> Route finished.")
-				self.start_goal = None
-				self.end_goal = None
+				self.reset(None)
 		else:
 			rospy.loginfo("Simple goal reached.")
-			self.start_goal = None
-			self.end_goal = None
+			self.reset(None)
 
 		self.update_plan()
 
