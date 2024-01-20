@@ -46,39 +46,45 @@ class Navigator:
 	def dist(self, p1, p2):
 		return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
-	def plan(self, robot_pos, start, goal):
+	def plan(self, robot_pos, start, goal, path_width):
 
+		#no need to plan if there's no obstacles
 		if self.obstacles.obstacle_count() == 0:
 			self.publish_local_plan([])
 			return [start, goal]
 		
+		#transform goals into grid space
 		start_scaled = (start.position.x / self.grid_size, start.position.y / self.grid_size)
 		goal_scaled = (goal.position.x / self.grid_size, goal.position.y / self.grid_size)
 
+		#find path of max deviation width
 		astarpath = self.astar.search(
 			(round(start_scaled[0]), round(start_scaled[1])),
-			(round(goal_scaled[0]), round(goal_scaled[1]))
+			(round(goal_scaled[0]), round(goal_scaled[1])),
+			path_width / self.grid_size
 		)
 
+		#no path, but maybe we can make one ;)
 		if len(astarpath) == 0:
 			self.publish_local_plan([])
 			return [start, goal]
 		
+		# continue path smoothly from a later segment in case of on the fly replanning
 		if robot_pos != start:
 			robot_scaled = (robot_pos.position.x / self.grid_size, robot_pos.position.y / self.grid_size)
-
 			i = find_closest_segment(robot_scaled, astarpath)
 			astarpath = astarpath[i:]
 
+		
 		diagonal = math.hypot(self.grid_size, self.grid_size)
-
-		print("start:",self.dist(astarpath[0], start_scaled)," end:", self.dist(astarpath[-1], goal_scaled)," dist:", diagonal)
-
+		#print("start:",self.dist(astarpath[0], start_scaled)," end:", self.dist(astarpath[-1], goal_scaled)," dist:", diagonal)
+		
 		if self.dist(astarpath[0], start_scaled) < diagonal:
 			astarpath[0] = start_scaled
 
 		if self.dist(astarpath[-1], goal_scaled) < diagonal:
 			astarpath[-1] = goal_scaled
+		
 
 		poses = []
 		poses_stamped = []

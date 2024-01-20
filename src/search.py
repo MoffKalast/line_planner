@@ -11,19 +11,31 @@ class WishUponAStar:
 
 	def heuristic(self, start, goal):
 		# Using Euclidean distance
-		return math.hypot(start[0] - goal[0],start[1] - goal[1])
+		return math.hypot(start[0] - goal[0], start[1] - goal[1])
 
-	def get_neighbors(self, node):
+	def get_neighbors(self, node, max_width, max_width_sq):
+		def is_clear(p):
+			x0, y0 = p
+			for x in range(-max_width, max_width + 1):
+				for y in range(-max_width, max_width + 1):
+					if x**2 + y**2 <= max_width_sq and (x0 + x, y0 + y) in self.obstacles.entries:
+						return False
+			return True
+
 		x, y = node
 		directions = [
-			 (x, y - 1),(x - 1, y), (x + 1, y),(x, y + 1)
+			(x, y - 1),(x - 1, y), (x + 1, y),(x, y + 1)
 		]
-		neighbors = [(nx, ny) for nx, ny in directions if (nx, ny) not in self.obstacles.entries]
+
+		neighbors = [(nx, ny) for nx, ny in directions if (nx, ny) not in self.obstacles.entries and is_clear((nx, ny))]
+
 		return neighbors
 
-	def search(self, start, goal, max_distance=10.0):
+	def search(self, start, goal, path_width, max_distance=20.0):
 
-		max_distance = self.heuristic(start, goal) + max_distance
+		max_width = math.ceil(path_width)
+		max_width_sq = math.ceil(path_width**2)
+		max_distance = self.heuristic(start, goal) * 2 + max_distance
 
 		open_set = []
 		heapq.heappush(open_set, (0, start))
@@ -43,9 +55,9 @@ class WishUponAStar:
 				continue  # Skip processing this node as it's beyond the max distance
 
 			if current == goal:
-				return self.reconstruct_path(came_from, current)
+				return self.reconstruct_path(came_from, current, max_width)
 
-			for neighbor in self.get_neighbors(current):
+			for neighbor in self.get_neighbors(current, max_width, max_width_sq):
 				tentative_g_score = g_score[current] + math.sqrt(self.heuristic(current, neighbor))
 
 				if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
@@ -62,22 +74,26 @@ class WishUponAStar:
 
 		# If the goal was unreachable within the max_distance, return the path to the closest node found
 		if closest_node != goal:
-			return self.reconstruct_path(came_from, closest_node)
+			return self.reconstruct_path(came_from, closest_node, max_width)
 
 		return None  # No path found and start was the closest
 
-	def reconstruct_path(self, came_from, current):
+	def reconstruct_path(self, came_from, current, max_width):
 		path = [current]
 		while current in came_from:
 			current = came_from[current]
 			path.append(current)
 		path.reverse()
-		return self.optimize_path(path)
-	
+		return self.optimize_path(path, max_width)
+
+
 	def has_line_of_sight(self, point1, point2):
 		# Check if there's a clear line of sight between point1 and point2
-		x0, y0 = point1
-		x1, y1 = point2
+		x0 = round(point1[0])
+		y0 = round(point1[1])
+
+		x1 = round(point2[0])
+		y1 = round(point2[1])
 
 		dx = x1 - x0
 		dy = y1 - y0
@@ -110,7 +126,32 @@ class WishUponAStar:
 
 		return True
 
-	def optimize_path(self, path):
+	def has_clear_corridor(self, point1, point2, max_width):
+
+		if point1 == point2:
+			return True
+
+		x1, y1 = point1
+		x2, y2 = point2
+
+		delta_x = x2 - x1
+		delta_y = y2 - y1
+
+		# Normalize the direction vector
+		magnitude = math.hypot(delta_x,delta_y)
+		delta_x = (delta_x / magnitude) * max_width
+		delta_y = (delta_y / magnitude) * max_width
+
+		# Calculate perpendicular vectors
+		start_left = (x1 + delta_y, y1 - delta_x)
+		start_right = (x1 - delta_y, y1 + delta_x)
+
+		end_left = (x2 + delta_y, y2 - delta_x)
+		end_right = (x2 - delta_y, y2 + delta_x)
+
+		return self.has_line_of_sight(start_left, end_left) and self.has_line_of_sight(start_right, end_right)
+
+	def optimize_path(self, path, max_width):
 		# Reduce number of points in path by skipping unnecessary waypoints
 		if not path:
 			return []
@@ -124,7 +165,7 @@ class WishUponAStar:
 				continue
 			
 			for j in range(len(path) - 1, i, -1):
-				if self.has_line_of_sight(optimized_path[-1], path[j]):
+				if self.has_clear_corridor(optimized_path[-1], path[j], max_width):
 					optimized_path.append(path[j])
 					skip = j - i - 1
 					break

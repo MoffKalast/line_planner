@@ -24,11 +24,12 @@ PLANNING_FRAME = "map"
 
 class GoalServer:
 
-	def __init__(self, tf2_buffer, update_plan):
+	def __init__(self, tf2_buffer, line_divergence, update_plan):
 		self.start_goal = None
 		self.end_goal = None
 		self.tf2_buffer = tf2_buffer
 		self.update_plan = update_plan
+		self.line_divergence = line_divergence
 
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/waypoints", Path, self.route_callback)
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
@@ -62,7 +63,7 @@ class GoalServer:
 		
 		try:
 			robot_pos = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
-			self.subroute = self.navigator.plan(robot_pos, robot_pos, self.original_end_goal)
+			self.subroute = self.navigator.plan(robot_pos, robot_pos, self.original_end_goal, self.line_divergence)
 
 			self.start_goal = self.subroute[0]
 			self.end_goal = self.subroute[1]
@@ -139,7 +140,7 @@ class GoalServer:
 			self.original_start_goal = self.start_goal
 			self.original_end_goal = self.end_goal
 
-			self.subroute = self.navigator.plan(robot_pos, self.start_goal, self.end_goal)
+			self.subroute = self.navigator.plan(robot_pos, self.start_goal, self.end_goal, self.line_divergence)
 			self.start_goal = self.subroute[0]
 			self.end_goal = self.subroute[1]
 			self.subroute = self.subroute[1:]
@@ -210,7 +211,7 @@ class LineFollowingController:
 			rospy.get_param('D', 65.0)
 		)
 
-		self.goal_server = GoalServer(self.tf2_buffer, self.update_plan)
+		self.goal_server = GoalServer(self.tf2_buffer, self.LINE_DIVERGENCE, self.update_plan)
 		self.active = False
 
 		self.reconfigure_server = DynamicReconfigureServer(LinePlannerConfig, self.dynamic_reconfigure_callback)
@@ -239,6 +240,8 @@ class LineFollowingController:
 		self.MAX_PROJECT_DIST = config.max_project_dist
 
 		self.DEBUG_MARKERS = config.publish_debug_markers
+
+		self.goal_server.line_divergence = self.LINE_DIVERGENCE
 
 		return config
 

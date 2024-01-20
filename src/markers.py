@@ -29,26 +29,15 @@ class DebugMarkers:
 		delta_y = y2 - y1
 
 		# Normalize the direction vector
-		magnitude = math.hypot(delta_x,delta_y)
-		delta_x /= magnitude
-		delta_y /= magnitude
+		magnitude = math.hypot(delta_x,delta_y) + 0.0001
+		delta_x = (delta_x / magnitude) * max_divergence
+		delta_y = (delta_y / magnitude) * max_divergence
 
 		# Calculate perpendicular vectors
-		start_left = Point()
-		start_left.x = x1 + max_divergence * delta_y
-		start_left.y = y1 - max_divergence * delta_x
-
-		start_right = Point()
-		start_right.x = x1 - max_divergence * delta_y
-		start_right.y = y1 + max_divergence * delta_x
-
-		end_left = Point()
-		end_left.x = x2 + max_divergence * delta_y
-		end_left.y = y2 - max_divergence * delta_x
-
-		end_right = Point()
-		end_right.x = x2 - max_divergence * delta_y
-		end_right.y = y2 + max_divergence * delta_x
+		start_left = Point(x1 + delta_y, y1 - delta_x, 0)
+		start_right = Point(x1 - delta_y, y1 + delta_x, 0)
+		end_left = Point(x2 + delta_y, y2 - delta_x, 0)
+		end_right = Point(x2 - delta_y, y2 + delta_x, 0)
 
 		return start_left, start_right, end_left, end_right
 
