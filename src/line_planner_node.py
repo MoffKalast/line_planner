@@ -24,12 +24,12 @@ PLANNING_FRAME = "map"
 
 class GoalServer:
 
-	def __init__(self, tf2_buffer, line_divergence, update_plan):
+	def __init__(self, tf2_buffer, max_path_width, update_plan):
 		self.start_goal = None
 		self.end_goal = None
 		self.tf2_buffer = tf2_buffer
 		self.update_plan = update_plan
-		self.line_divergence = line_divergence
+		self.max_path_width = max_path_width
 
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/waypoints", Path, self.route_callback)
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
@@ -45,7 +45,7 @@ class GoalServer:
 		self.route_index = 0
 
 		self.subroute = []
-		self.navigator = Navigator(PLANNING_FRAME, tf2_buffer, 0.5, self.obstacle_change_callback)
+		self.navigator = Navigator(PLANNING_FRAME, tf2_buffer, 1.0, self.obstacle_change_callback)
 
 	def reset(self, msg):
 		self.original_start_goal = None
@@ -56,6 +56,7 @@ class GoalServer:
 		self.route_index = 0
 		self.subroute = []
 		self.update_plan()
+		self.navigator.obstacles.clear_grid(None)
 
 	def obstacle_change_callback(self):
 		if self.original_start_goal is None or self.original_end_goal is None:
@@ -63,17 +64,19 @@ class GoalServer:
 		
 		try:
 			robot_pos = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
-			self.subroute = self.navigator.plan(robot_pos, robot_pos, self.original_end_goal, self.line_divergence)
+			self.subroute = self.navigator.plan(robot_pos, robot_pos, self.original_end_goal, self.max_path_width)
 
-			self.start_goal = self.subroute[0]
-			self.end_goal = self.subroute[1]
-			self.subroute = self.subroute[1:]
-			self.update_plan()
+			if len(self.subroute) >= 2:
+				self.start_goal = self.subroute[0]
+				self.end_goal = self.subroute[1]
+				self.subroute = self.subroute[1:]
+				self.update_plan()
+			else:
+				self.reset()
 
 		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 			rospy.logwarn("TF2 exception: %s", e)
 			self.reset(None)
-
 
 	def goal_callback(self, goal):
 		self.route = []
@@ -140,12 +143,15 @@ class GoalServer:
 			self.original_start_goal = self.start_goal
 			self.original_end_goal = self.end_goal
 
-			self.subroute = self.navigator.plan(robot_pos, self.start_goal, self.end_goal, self.line_divergence)
-			self.start_goal = self.subroute[0]
-			self.end_goal = self.subroute[1]
-			self.subroute = self.subroute[1:]
+			self.subroute = self.navigator.plan(robot_pos, self.start_goal, self.end_goal, self.max_path_width)
 
-			self.update_plan()
+			if len(self.subroute) >= 2:
+				self.start_goal = self.subroute[0]
+				self.end_goal = self.subroute[1]
+				self.subroute = self.subroute[1:]
+				self.update_plan()
+			else:
+				self.reset()			
 
 		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 			rospy.logwarn("TF2 exception: %s", e)
@@ -186,6 +192,7 @@ class LineFollowingController:
 		self.MIN_LINEAR_SPD = rospy.get_param('~min_linear_velocity', 0.1)
 		self.MAX_LINEAR_SPD = rospy.get_param('max_linear_velocity', 0.45)
 
+		self.ROBOT_WIDTH = rospy.get_param('~robot_width', 0.3)
 		self.LINE_DIVERGENCE = rospy.get_param('~max_line_divergence', 1.0)
 		self.MIN_PROJECT_DIST = rospy.get_param('~min_project_dist', 0.15)
 		self.MAX_PROJECT_DIST = rospy.get_param('~max_project_dist', 1.2)
@@ -211,7 +218,7 @@ class LineFollowingController:
 			rospy.get_param('D', 65.0)
 		)
 
-		self.goal_server = GoalServer(self.tf2_buffer, self.LINE_DIVERGENCE, self.update_plan)
+		self.goal_server = GoalServer(self.tf2_buffer, self.LINE_DIVERGENCE+self.ROBOT_WIDTH, self.update_plan)
 		self.active = False
 
 		self.reconfigure_server = DynamicReconfigureServer(LinePlannerConfig, self.dynamic_reconfigure_callback)
@@ -241,7 +248,7 @@ class LineFollowingController:
 
 		self.DEBUG_MARKERS = config.publish_debug_markers
 
-		self.goal_server.line_divergence = self.LINE_DIVERGENCE
+		self.goal_server.max_path_width = self.LINE_DIVERGENCE+self.ROBOT_WIDTH
 
 		return config
 

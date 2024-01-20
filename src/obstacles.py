@@ -24,7 +24,7 @@ class Obstacles:
 		self.remove_sub = rospy.Subscriber('/obstacle_grid/remove_polygon', PolygonStamped, self.remove_obstacle) 
 		self.add_sub = rospy.Subscriber('/obstacle_grid/add_polygon', PolygonStamped, self.add_obstacle)
 		self.add_sub = rospy.Subscriber('/obstacle_grid/add_points', PolygonStamped, self.add_obstacle)
-		self.add_sub = rospy.Subscriber('/obstacle_grid/clear', Empty, self.clear_obstacles)
+		self.add_sub = rospy.Subscriber('/obstacle_grid/clear', Empty, self.clear_grid)
 		self.grid_pub = rospy.Publisher('/obstacle_grid', GridCells, queue_size=10, latch=True)
 
 		self.sonar_sub = rospy.Subscriber('/sonars', Range, self.range_callback)
@@ -33,7 +33,7 @@ class Obstacles:
 		self.laser_projector = laser_geometry.LaserProjection()
 		self.publish_grid()
 		
-	def clear_obstacles(self, msg):
+	def clear_grid(self, msg):
 		self.entries.clear()
 		self.publish_grid()
 	

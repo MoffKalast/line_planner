@@ -65,14 +65,16 @@ class Navigator:
 		)
 
 		#no path, but maybe we can make one ;)
-		if len(astarpath) == 0:
+		if len(astarpath) < 2:
+			rospy.logerr("Path not found!")
 			self.publish_local_plan([])
-			return [start, goal]
+			return []
 		
 		# continue path smoothly from a later segment in case of on the fly replanning
 		if robot_pos != start:
 			robot_scaled = (robot_pos.position.x / self.grid_size, robot_pos.position.y / self.grid_size)
 			i = find_closest_segment(robot_scaled, astarpath)
+			rospy.loginfo("Continuing from segment ",i)
 			astarpath = astarpath[i:]
 
 		

@@ -14,20 +14,26 @@ class WishUponAStar:
 		return math.hypot(start[0] - goal[0], start[1] - goal[1])
 
 	def get_neighbors(self, node, max_width, max_width_sq):
-		def is_clear(p):
+		def get_obstacle_hits(p):
 			x0, y0 = p
+			hits = 0
 			for x in range(-max_width, max_width + 1):
 				for y in range(-max_width, max_width + 1):
-					if x**2 + y**2 <= max_width_sq and (x0 + x, y0 + y) in self.obstacles.entries:
-						return False
-			return True
+					if (x0 + x, y0 + y) in self.obstacles.entries: #x**2 + y**2 <= max_width_sq and 
+						hits +=1
+			return hits
 
 		x, y = node
 		directions = [
 			(x, y - 1),(x - 1, y), (x + 1, y),(x, y + 1)
 		]
 
-		neighbors = [(nx, ny) for nx, ny in directions if (nx, ny) not in self.obstacles.entries and is_clear((nx, ny))]
+		overlap_points = [(get_obstacle_hits(p), p) for p in directions]
+		neighbors = [p for hits, p in overlap_points if hits == 0]
+
+		if len(neighbors) == 0:
+			#find the least obstructed point and go that way to get unstuck
+			return [sorted(overlap_points, key=lambda x: x[0])[0][1]]
 
 		return neighbors
 
@@ -88,7 +94,7 @@ class WishUponAStar:
 
 
 	def has_line_of_sight(self, point1, point2):
-		# Check if there's a clear line of sight between point1 and point2
+		# Check if there's a clear line of sight between point1 and point2 with Bresenham
 		x0 = round(point1[0])
 		y0 = round(point1[1])
 
