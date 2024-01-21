@@ -1,12 +1,17 @@
 <launch>
 
+    <arg name="robot_frame" default="turtle1" />
+    <arg name="planning_frame" default="world" />
+    <arg name="obstacle_grid_size" default="0.5" />
+
     <!-- launch the sim-->
     <include file="$(find turtle_tf2)/launch/turtle_tf2_demo.launch"/>
 
     <node name="line_planner" pkg="line_planner" type="line_planner_node.py" output="screen">
 
-        <param name="robot_frame" value="turtle1"/>
-        <param name="planning_frame" value="world"/>
+        <param name="robot_frame" value="$(arg robot_frame)"/>
+        <param name="planning_frame" value="$(arg planning_frame)"/>
+        <param name="obstacle_grid_size" value="$(arg obstacle_grid_size)"/>
 
         <param name="publish_debug_markers" value="true"/>
 
@@ -14,7 +19,7 @@
 
         <param name="linear_acceleration" value="0.05"/>
         <param name="min_linear_velocity" value="0.01"/>
-        <param name="max_linear_velocity" value="1.5"/>
+        <param name="max_linear_velocity" value="1.0"/>
         
         <!-- If base_link is this far away from the line, the projected distance will be min and scale to max when it's on the line.-->
         <param name="max_line_divergence" value="0.5"/>
@@ -46,6 +51,9 @@
 
     </node>
     
-    <node name="area_to_path_node" pkg="line_planner" type="area_to_path_node.py" output="screen"/>
+    <!-- Takes polygons and makes Path patterns.-->
+    <node name="area_to_path_node" pkg="line_planner" type="area_to_path_node.py" output="screen">
+        <param name="step_size" value="0.5"/>
+    </node>
 
 </launch>

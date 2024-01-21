@@ -15,12 +15,13 @@ from tf.transformations import euler_from_quaternion
 from tf2_geometry_msgs import do_transform_pose
 
 from dynamic_reconfigure.server import Server as DynamicReconfigureServer
-
 from line_planner.cfg import LinePlannerConfig
+
 from nav_msgs.msg import Path
 
 ROBOT_FRAME = "base_link"
 PLANNING_FRAME = "map"
+GRID_SIZE = 1.0
 
 class GoalServer:
 
@@ -45,7 +46,7 @@ class GoalServer:
 		self.route_index = 0
 
 		self.subroute = []
-		self.navigator = Navigator(PLANNING_FRAME, tf2_buffer, 1.0, self.obstacle_change_callback)
+		self.navigator = Navigator(tf2_buffer, PLANNING_FRAME, GRID_SIZE, self.obstacle_change_callback)
 
 	def reset(self, msg):
 		self.original_start_goal = None
@@ -72,7 +73,7 @@ class GoalServer:
 				self.subroute = self.subroute[1:]
 				self.update_plan()
 			else:
-				self.reset()
+				self.reset(None)
 
 		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 			rospy.logwarn("TF2 exception: %s", e)
@@ -151,7 +152,7 @@ class GoalServer:
 				self.subroute = self.subroute[1:]
 				self.update_plan()
 			else:
-				self.reset()			
+				self.reset(None)			
 
 		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 			rospy.logwarn("TF2 exception: %s", e)
@@ -180,10 +181,11 @@ class GoalServer:
 class LineFollowingController:
 	def __init__(self):
 		rospy.init_node("line_following_controller")
-		global ROBOT_FRAME, PLANNING_FRAME
+		global ROBOT_FRAME, PLANNING_FRAME, GRID_SIZE
 
 		ROBOT_FRAME = rospy.get_param('~robot_frame', 'base_link')
 		PLANNING_FRAME = rospy.get_param('~planning_frame', 'map')
+		GRID_SIZE = rospy.get_param('~obstacle_grid_size', 1.0)
 		
 		self.MIN_GOAL_DIST = rospy.get_param('~goal_distance_threshold', 0.6)
 		self.MAX_ANGULAR_SPD = rospy.get_param('~max_turning_velocity', 0.9)
@@ -242,6 +244,7 @@ class LineFollowingController:
 		self.MAX_ANGULAR_SPD = config.max_turning_velocity
 		self.MAX_LINEAR_SPD = config.max_linear_velocity
 
+		self.ROBOT_WIDTH = config.robot_width
 		self.LINE_DIVERGENCE = config.max_line_divergence
 		self.MIN_PROJECT_DIST = config.min_project_dist
 		self.MAX_PROJECT_DIST = config.max_project_dist

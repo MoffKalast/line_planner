@@ -1,36 +1,27 @@
 #!/usr/bin/env python3
 import rospy
-import tf2_ros
-import laser_geometry
 import numpy as np
 
-from std_msgs.msg import Bool, Empty
-from geometry_msgs.msg import PolygonStamped, Point32, PointStamped 
+from std_msgs.msg import Empty
+from geometry_msgs.msg import PolygonStamped, Point32 
 from nav_msgs.msg import GridCells
-from sensor_msgs.msg import Range
-
-from tf2_geometry_msgs import do_transform_point 
 
 class Obstacles:
 
-	def __init__(self, planning_frame, tf2_buffer, grid_size, obstacle_change_callback):
+	def __init__(self, tf2_buffer, PLANNING_FRAME, GRID_SIZE, obstacle_change_callback):
 
-		self.planning_frame = planning_frame
 		self.tf2_buffer = tf2_buffer
-		self.grid_size = grid_size
+		self.PLANNING_FRAME = PLANNING_FRAME
+		self.GRID_SIZE = GRID_SIZE
 		self.obstacle_change_callback = obstacle_change_callback
 
 		self.entries = set()
 		self.remove_sub = rospy.Subscriber('/obstacle_grid/remove_polygon', PolygonStamped, self.remove_obstacle) 
 		self.add_sub = rospy.Subscriber('/obstacle_grid/add_polygon', PolygonStamped, self.add_obstacle)
-		self.add_sub = rospy.Subscriber('/obstacle_grid/add_points', PolygonStamped, self.add_obstacle)
+		self.add_sub = rospy.Subscriber('/obstacle_grid/add_cells', GridCells, self.add_cells)
 		self.add_sub = rospy.Subscriber('/obstacle_grid/clear', Empty, self.clear_grid)
 		self.grid_pub = rospy.Publisher('/obstacle_grid', GridCells, queue_size=10, latch=True)
 
-		self.sonar_sub = rospy.Subscriber('/sonars', Range, self.range_callback)
-
-		# Create a LaserProjection object to convert LaserScan to PointCloud2
-		self.laser_projector = laser_geometry.LaserProjection()
 		self.publish_grid()
 		
 	def clear_grid(self, msg):
@@ -40,41 +31,28 @@ class Obstacles:
 	def obstacle_count(self):
 		return len(self.entries)
 
-	def range_callback(self, msg):
-		if msg.range < msg.max_range:
-			# Project the point into the "odom" frame
-			sonar_point = PointStamped()
-			sonar_point.header = msg.header
-			sonar_point.point.x = msg.range  # x-coordinate is the range
-			sonar_point.point.y = 0.0  # y-coordinate can be set based on your requirement
-			sonar_point.point.z = 0.0  # z-coordinate, assuming it's in 2D
-
-			try:
-				# Transform the point to the "odom" frame
-				transform_stamped = self.tf2_buffer.lookup_transform(self.planning_frame, sonar_point.header.frame_id, rospy.Time(0))
-				point = do_transform_point(sonar_point, transform_stamped).point
-				tuple = (int(round(point.x / self.grid_size)),int(round(point.y / self.grid_size)))
-
-				if not tuple in self.entries:
-					self.entries.add(tuple)
-					self.entries.add((tuple[0]+1,tuple[1]))
-					self.entries.add((tuple[0],tuple[1]+1))
-					self.entries.add((tuple[0]-1,tuple[1]))
-					self.entries.add((tuple[0],tuple[1]-1))
-
-					self.publish_grid()
-
-			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-				rospy.logerr("Transform failed: %s", str(e))
-
 	def remove_obstacle(self, msg):
 		self.update_grid_polygon(msg.polygon)
 
 	def add_obstacle(self, msg):
 		self.update_grid_polygon(msg.polygon, delete=True)
 
+	def add_cells(self, msg):
+		if msg.cell_width != self.GRID_SIZE or msg.cell_height != self.GRID_SIZE:
+			rospy.logerr("Obstacle grid size doesn't match, it should be "+str(self.GRID_SIZE))
+			return
+
+		grid_changed = False
+		for point in msg.cells:
+			point_tup = (round(point.x / self.GRID_SIZE),round(point.y / self.GRID_SIZE))
+			if not point_tup in self.entries:
+				self.entries.add(point_tup)
+				grid_changed = True
+
+		if grid_changed:
+			self.publish_grid()
+
 	def update_grid_polygon(self, polygon, delete=False):
-		
 		#TODO transform polygon into self.planning_frame
 
 		min_x = min(p.x for p in polygon.points)
@@ -83,31 +61,31 @@ class Obstacles:
 		max_y = max(p.y for p in polygon.points)
 		
 		# Discretize bounding box into grid coordinates
-		x_coords = np.arange(round(min_x / self.grid_size), round(max_x / self.grid_size), 1)
-		y_coords = np.arange(round(min_y / self.grid_size), round(max_y / self.grid_size), 1)
+		x_coords = np.arange(round(min_x / self.GRID_SIZE), round(max_x / self.GRID_SIZE), 1)
+		y_coords = np.arange(round(min_y / self.GRID_SIZE), round(max_y / self.GRID_SIZE), 1)
 
 		# Mark grid cells inside polygon as occupied
 		if delete:
 			for x in x_coords:
 				for y in y_coords:
-					self.entries.add((int(x),int(y)))
+					self.entries.add((x,y))
 		else:
 			for x in x_coords:
 				for y in y_coords:
-					self.entries.discard((int(x),int(y)))
+					self.entries.discard((x,y))
 
 		self.publish_grid()
 
 	def publish_grid(self):
 		grid = GridCells()
-		grid.header.frame_id = self.planning_frame
-		grid.cell_width = self.grid_size
-		grid.cell_height = self.grid_size
+		grid.header.frame_id = self.PLANNING_FRAME
+		grid.cell_width = self.GRID_SIZE
+		grid.cell_height = self.GRID_SIZE
 		grid.cells = []
 		for (x,y) in self.entries:
 			point = Point32()
-			point.x = x * self.grid_size
-			point.y = y * self.grid_size
+			point.x = x * self.GRID_SIZE
+			point.y = y * self.GRID_SIZE
 			grid.cells.append(point)
 			
 		self.grid_pub.publish(grid)

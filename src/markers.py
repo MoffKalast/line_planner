@@ -86,7 +86,7 @@ class DebugMarkers:
 			markerArray = MarkerArray()
 			markerArray.markers.append(line_marker(start_left, end_left, 0, 0.1, 0.6, 0.1))
 			markerArray.markers.append(line_marker(start_right, end_right, 1, 0.6, 0.2, 0.2))
-			markerArray.markers.append(line_marker(start_goal.position, end_goal.position, 2, 0.575, 0.870, 0.0261))
+			markerArray.markers.append(line_marker(start_goal.position, end_goal.position, 2, 0.870, 0.870, 0.870))
 			markerArray.markers.append(sphere_marker(start_goal.position, 3, 1.0, 0.0, 0.0, 0.2))
 			markerArray.markers.append(sphere_marker(end_goal.position, 4, 0.0, 0.0, 1.0, min_goal_dist*2))
 			markerArray.markers.append(sphere_marker(target_position, 5, 0.0, 1.0, 0.0, 0.2))

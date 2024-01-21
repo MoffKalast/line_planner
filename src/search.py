@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import heapq
 import math
+import rospy
 
 from obstacles import Obstacles
 
@@ -39,6 +40,9 @@ class WishUponAStar:
 
 	def search(self, start, goal, path_width, max_distance=20.0):
 
+		if start == goal:
+			return [start, goal]
+
 		max_width = math.ceil(path_width)
 		max_width_sq = math.ceil(path_width**2)
 		max_distance = self.heuristic(start, goal) * 2 + max_distance
@@ -61,6 +65,7 @@ class WishUponAStar:
 				continue  # Skip processing this node as it's beyond the max distance
 
 			if current == goal:
+				#rospy.logwarn("Search: Path found.")
 				return self.reconstruct_path(came_from, current, max_width)
 
 			for neighbor in self.get_neighbors(current, max_width, max_width_sq):
@@ -80,6 +85,7 @@ class WishUponAStar:
 
 		# If the goal was unreachable within the max_distance, return the path to the closest node found
 		if closest_node != goal:
+			rospy.logwarn("Search: Goal unreachable. getting as close as possible instead.")
 			return self.reconstruct_path(came_from, closest_node, max_width)
 
 		return None  # No path found and start was the closest
@@ -133,7 +139,6 @@ class WishUponAStar:
 		return True
 
 	def has_clear_corridor(self, point1, point2, max_width):
-
 		if point1 == point2:
 			return True
 

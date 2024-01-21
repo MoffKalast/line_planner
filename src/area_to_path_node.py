@@ -5,9 +5,10 @@ import rospy
 import itertools
 
 from nav_msgs.msg import Path
-from geometry_msgs.msg import PoseStamped, PolygonStamped, Point 
+from geometry_msgs.msg import PoseStamped, PolygonStamped, Point
 
 from dynamic_reconfigure.server import Server as DynamicReconfigureServer
+from line_planner.cfg import AreaToPathConfig
 
 class BoundingBox3DListener:
 	def __init__(self):
@@ -20,10 +21,16 @@ class BoundingBox3DListener:
 		self.sierra_sub = rospy.Subscriber("/area_to_path/victor_sierra", PolygonStamped, self.sierra_callback)
 		self.home_sub = rospy.Subscriber("/area_to_path/home", PolygonStamped, self.home_callback)
 
-		self.step_size = rospy.get_param("~step_size", 2.0)  # The step size (X meters) in the path
+		self.STEP_SIZE = rospy.get_param("~step_size", 2.0)  # The step size (X meters) in the path
 
 		self.home_point = None
 		self.home_header = None
+
+		self.reconfigure_server = DynamicReconfigureServer(AreaToPathConfig, self.dynamic_reconfigure_callback)
+
+	def dynamic_reconfigure_callback(self, config, level):
+		self.STEP_SIZE = config.step_size
+		return config
 
 	def send_path(self, header, poses):
 		if len(poses) == 0:
@@ -168,14 +175,14 @@ class BoundingBox3DListener:
 
 		# Continue drawing the spiral until we reach the edge of the square
 		for step in itertools.count(start=1, step=1):
-			if self.step_size * step > max(length_side_1, length_side_2):  # If we would go beyond the edge of the square, end the spiral
+			if self.STEP_SIZE * step > max(length_side_1, length_side_2):  # If we would go beyond the edge of the square, end the spiral
 				break
 
 			for _ in range(2):  # Each "layer" of the spiral consists of two steps
 				for _ in range(step):
 					if abs(pos[0] - center.x) <= length_side_1 / 2 and abs(pos[1] - center.y) <= length_side_2 / 2:
-						pos[0] += dir[0] * self.step_size
-						pos[1] += dir[1] * self.step_size
+						pos[0] += dir[0] * self.STEP_SIZE
+						pos[1] += dir[1] * self.STEP_SIZE
 
 				
 				poses.append(self.get_pose(msg.header, pos[0], pos[1]))
@@ -208,14 +215,14 @@ class BoundingBox3DListener:
 		if length_side_1 > length_side_2:
 			vec_step = self.norm(vec_side_2)
 			vec_side = vec_side_1
-			steps = math.ceil(length_side_2 / self.step_size)
+			steps = math.ceil(length_side_2 / self.STEP_SIZE)
 		else:
 			vec_step = self.norm(vec_side_1)
 			vec_side = vec_side_2
-			steps = math.ceil(length_side_1 / self.step_size)
+			steps = math.ceil(length_side_1 / self.STEP_SIZE)
 
-		vec_step.x *= self.step_size
-		vec_step.y *= self.step_size
+		vec_step.x *= self.STEP_SIZE
+		vec_step.y *= self.STEP_SIZE
 
 		for i in range(steps):
 			if i % 2 == 0:  # For every other line, the direction should be reversed
