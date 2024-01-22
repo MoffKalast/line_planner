@@ -3,6 +3,7 @@ import rospy
 import math
 import tf
 import tf2_ros
+import sys
 
 from utils import *
 from navigator import Navigator
@@ -80,17 +81,19 @@ class GoalServer:
 			self.reset(None)
 
 	def goal_callback(self, goal):
-		self.route = []
-		self.route_index = 0
+		self.reset(None)
+		#self.route = []
+		#self.route_index = 0
 		self.process_goal(goal)
 		self.update_plan()
 
 	def route_callback(self, msg):
+		self.reset(None)
 		rospy.loginfo("New route received.")
 
 		if len(msg.poses) == 0:
 			rospy.loginfo("Empty route, stopping.")
-			self.reset(None)
+			#self.reset(None)
 			return
 
 		self.route = msg.poses
@@ -341,6 +344,10 @@ class LineFollowingController:
 
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 			rospy.logwarn("TF Exception")
+		except Exception as e:
+			rospy.logerr('An exception occurred: {}'.format(e))
+		except:
+			rospy.logerr("Unexpected error: "+str(sys.exc_info()[0]))
 
 	def update_plan(self):
 
