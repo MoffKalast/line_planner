@@ -65,7 +65,7 @@ class WishUponAStar:
 				continue  # Skip processing this node as it's beyond the max distance
 
 			if current == goal:
-				#rospy.logwarn("Search: Path found.")
+				rospy.logwarn("Search: Path found.")
 				return self.reconstruct_path(came_from, current, max_width)
 
 			for neighbor in self.get_neighbors(current, max_width, max_width_sq):
@@ -91,6 +91,9 @@ class WishUponAStar:
 		return None  # No path found and start was the closest
 
 	def reconstruct_path(self, came_from, current, max_width):
+		print("searched cells",len(came_from))
+		print("current",current)
+		print("next",came_from[current])
 		path = [current]
 		while current in came_from:
 			current = came_from[current]
@@ -99,8 +102,20 @@ class WishUponAStar:
 		return self.optimize_path(path, max_width)
 
 
-	def has_line_of_sight(self, point1, point2):
+	def has_line_of_sight(self, point1, point2, max_width):
 		# Check if there's a clear line of sight between point1 and point2 with Bresenham
+
+		max_width_sq = max_width**2
+
+		def get_obstacle_hits(p):
+			x0, y0 = p
+			hits = 0
+			for x in range(-max_width, max_width + 1):
+				for y in range(-max_width, max_width + 1):
+					if x**2 + y**2 <= max_width_sq and(x0 + x, y0 + y) in self.obstacles.entries: 
+						hits +=1
+			return hits
+
 		x0 = round(point1[0])
 		y0 = round(point1[1])
 
@@ -118,7 +133,7 @@ class WishUponAStar:
 		if dx > dy:
 			err = dx / 2.0
 			while x0 != x1:
-				if (x0, y0) in self.obstacles.entries:
+				if get_obstacle_hits((x0, y0)) > 0:
 					return False
 				err -= dy
 				if err <= 0:
@@ -128,7 +143,7 @@ class WishUponAStar:
 		else:
 			err = dy / 2.0
 			while y0 != y1:
-				if (x0, y0) in self.obstacles.entries:
+				if get_obstacle_hits((x0, y0)) > 0:
 					return False
 				err -= dx
 				if err <= 0:
@@ -160,27 +175,31 @@ class WishUponAStar:
 		end_left = (x2 + delta_y, y2 - delta_x)
 		end_right = (x2 - delta_y, y2 + delta_x)
 
-		return self.has_line_of_sight(start_left, end_left) and self.has_line_of_sight(start_right, end_right)
+		return self.has_line_of_sight(start_left, end_left, max_width) and self.has_line_of_sight(start_right, end_right, max_width)
 
 	def optimize_path(self, path, max_width):
+
+		reduced_width = min(max_width - 1, 1) #one cell
+
 		# Reduce number of points in path by skipping unnecessary waypoints
 		if not path:
 			return []
 
-		optimized_path = [path[0]]
-		skip = 0
-
-		for i in range(1, len(path)):
-			if skip > 0:
-				skip -= 1
-				continue
-			
+		optimized_path = []
+		
+		i = 0
+		while i < len(path):
+			optimized_path.append(path[i])
 			for j in range(len(path) - 1, i, -1):
-				if self.has_clear_corridor(optimized_path[-1], path[j], max_width):
-					optimized_path.append(path[j])
-					skip = j - i - 1
+				if path[i] == path[j] or self.has_clear_corridor(optimized_path[-1], path[j], reduced_width):
+					i = j
 					break
 			else:
-				optimized_path.append(path[i])
+				i+=1
+			
+			print(i)
 
-		return optimized_path[:-1]
+		print("path",len(path))
+		print("optimized_path",len(optimized_path))
+
+		return optimized_path

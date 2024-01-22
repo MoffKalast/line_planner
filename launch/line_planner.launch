@@ -32,8 +32,8 @@
 
         <!-- PID params for heading control.-->
         <param name="P" value="3.0"/>
-        <param name="I" value="0.001"/>
-        <param name="D" value="65.0"/>
+        <param name="I" value="0.002"/>
+        <param name="D" value="35.0"/>
 
         <!-- If the robot frame is away from the line, the goal will be mirrored into the opposite direction and multiplied with this value.-->
         <param name="side_offset_mult" value="0.5"/>

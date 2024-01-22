@@ -43,7 +43,7 @@ class SensorObstacleNode:
 		self.tf2_listener = tf2_ros.TransformListener(self.tf2_buffer)
 
 		self.scan_sub = rospy.Subscriber('/scan', LaserScan, self.scan_callback)
-		#self.sonar_sub = rospy.Subscriber('/sonars', Range, self.range_callback)
+		self.sonar_sub = rospy.Subscriber('/sonars', Range, self.range_callback)
 
 		self.cells_pub = rospy.Publisher('/obstacle_grid/add_cells', GridCells, queue_size=1)
 
