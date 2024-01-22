@@ -65,7 +65,7 @@ class WishUponAStar:
 				continue  # Skip processing this node as it's beyond the max distance
 
 			if current == goal:
-				rospy.logwarn("Search: Path found.")
+				rospy.loginfo("Search: Path found.")
 				return self.reconstruct_path(came_from, current, max_width)
 
 			for neighbor in self.get_neighbors(current, max_width, max_width_sq):
@@ -93,7 +93,7 @@ class WishUponAStar:
 	def reconstruct_path(self, came_from, current, max_width):
 		print("searched cells",len(came_from))
 		print("current",current)
-		print("next",came_from[current])
+		#print("next",came_from[current])
 		path = [current]
 		while current in came_from:
 			current = came_from[current]

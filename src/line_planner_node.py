@@ -107,6 +107,7 @@ class GoalServer:
 	def goal_reached(self):
 		subroute_len = len(self.subroute) 
 
+		#if we're following a subroute, continue
 		if subroute_len > 0:
 			if subroute_len == 1:
 				self.navigator.publish_local_plan([])
@@ -134,6 +135,7 @@ class GoalServer:
 		self.update_plan()
 
 	def set_goal_pair(self, endgoal):
+		# set up the two currently active points to follow a line between
 		try:
 			robot_pos = transform_to_pose(self.tf2_buffer.lookup_transform(PLANNING_FRAME, ROBOT_FRAME, rospy.Time(0)))
 
@@ -161,6 +163,7 @@ class GoalServer:
 			rospy.logwarn("TF2 exception: %s", e)
 
 	def process_goal(self, goal):
+		# transform goal into planning frame, print debug info
 		if PLANNING_FRAME == goal.header.frame_id:
 			rospy.loginfo("------------------")
 			rospy.loginfo("Received goal in planning ("+PLANNING_FRAME+") frame.")

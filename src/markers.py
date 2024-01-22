@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import rospy
 import math
 
@@ -74,7 +76,7 @@ class DebugMarkers:
 
 			marker.colors = [c, c]
 
-			marker.scale.x = 0.05
+			marker.scale.x = 0.03
 			marker.id = marker_id
 			return marker
 

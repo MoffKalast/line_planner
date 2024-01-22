@@ -16,8 +16,8 @@ class Obstacles:
 		self.obstacle_change_callback = obstacle_change_callback
 
 		self.entries = set()
-		self.remove_sub = rospy.Subscriber('/obstacle_grid/remove_polygon', PolygonStamped, self.remove_obstacle) 
-		self.add_sub = rospy.Subscriber('/obstacle_grid/add_polygon', PolygonStamped, self.add_obstacle)
+		self.remove_sub = rospy.Subscriber('/obstacle_grid/remove_polygon', PolygonStamped, self.remove_polygon) 
+		self.add_sub = rospy.Subscriber('/obstacle_grid/add_polygon', PolygonStamped, self.add_polygon)
 		self.add_sub = rospy.Subscriber('/obstacle_grid/add_cells', GridCells, self.add_cells)
 		self.add_sub = rospy.Subscriber('/obstacle_grid/clear', Empty, self.clear_grid)
 		self.grid_pub = rospy.Publisher('/obstacle_grid', GridCells, queue_size=10, latch=True)
@@ -31,10 +31,10 @@ class Obstacles:
 	def obstacle_count(self):
 		return len(self.entries)
 
-	def remove_obstacle(self, msg):
+	def remove_polygon(self, msg):
 		self.update_grid_polygon(msg.polygon)
 
-	def add_obstacle(self, msg):
+	def add_polygon(self, msg):
 		self.update_grid_polygon(msg.polygon, delete=True)
 
 	def add_cells(self, msg):
