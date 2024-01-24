@@ -50,6 +50,8 @@
     <node name="sensor_to_obstacle_node" pkg="line_planner" type="sensor_to_obstacle_node.py" output="screen">
         <param name="planning_frame" value="$(arg planning_frame)"/>
         <param name="obstacle_grid_size" value="$(arg obstacle_grid_size)"/>
+        <remap from="/scan" to="/scan_filtered"/>
+        <remap from="/sonars" to="/sonars_filtered"/>
     </node>
     
     <!-- Takes polygons and makes Path patterns.-->
@@ -58,3 +60,4 @@
     </node>
 
 </launch>
+

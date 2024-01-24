@@ -42,12 +42,17 @@ class Obstacles:
 			rospy.logerr("Obstacle grid size doesn't match, it should be "+str(self.GRID_SIZE))
 			return
 
+
+		added = 0
 		grid_changed = False
 		for point in msg.cells:
 			point_tup = (round(point.x / self.GRID_SIZE),round(point.y / self.GRID_SIZE))
 			if not point_tup in self.entries:
 				self.entries.add(point_tup)
 				grid_changed = True
+				added+=1
+
+		rospy.loginfo("Added "+str(added)+" to set, current size:"+str(len(self.entries)))
 
 		if grid_changed:
 			self.publish_grid()

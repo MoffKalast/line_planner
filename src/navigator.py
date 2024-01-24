@@ -80,7 +80,7 @@ class Navigator:
 		if robot_pos != start:
 			robot_scaled = (robot_pos.position.x / self.GRID_SIZE, robot_pos.position.y / self.GRID_SIZE)
 			i = find_closest_segment(robot_scaled, astarpath)
-			rospy.loginfo("Continuing from segment ",i)
+			rospy.loginfo("Continuing from segment "+str(i))
 			astarpath = astarpath[i:]
 
 		

@@ -47,6 +47,20 @@ class SensorObstacleNode:
 
 		self.cells_pub = rospy.Publisher('/obstacle_grid/add_cells', GridCells, queue_size=1)
 
+		self.message = self.new_grid()
+
+	def new_grid(self):
+		grid = GridCells()
+		grid.header.frame_id = self.PLANNING_FRAME
+		grid.cell_width = self.GRID_SIZE
+		grid.cell_height = self.GRID_SIZE
+		grid.cells = []
+		return grid
+
+	def send(self):
+		self.cells_pub.publish(self.message)
+		self.message = self.new_grid()
+
 	def transform_points(self, points, source_frame, target_frame):
 		try:
 			transform = self.tf2_buffer.lookup_transform(target_frame, source_frame, rospy.Time(0), rospy.Duration(1.0))
@@ -74,19 +88,12 @@ class SensorObstacleNode:
 
 		if world_points is None:
 			return
-
-		grid = GridCells()
-		grid.header.frame_id = self.PLANNING_FRAME
-		grid.cell_width = self.GRID_SIZE
-		grid.cell_height = self.GRID_SIZE
-		grid.cells = []
+		
 		for (x,y) in world_points:
 			point = Point32()
 			point.x = x * self.GRID_SIZE
 			point.y = y * self.GRID_SIZE
-			grid.cells.append(point)
-			
-		self.cells_pub.publish(grid)		
+			self.message.cells.append(point)	
 
 	def range_callback(self, msg):
 		if msg.range < msg.max_range:
@@ -103,11 +110,7 @@ class SensorObstacleNode:
 				point = do_transform_point(sonar_point, transform_stamped).point
 				tuple = (int(round(point.x / self.GRID_SIZE)),int(round(point.y / self.GRID_SIZE)))
 
-				grid = GridCells()
-				grid.header.frame_id = self.PLANNING_FRAME
-				grid.cell_width = self.GRID_SIZE
-				grid.cell_height = self.GRID_SIZE
-				grid.cells = [
+				self.message.cells += [
 					Point32(
 						tuple[0] * self.GRID_SIZE,
 						tuple[1] * self.GRID_SIZE,
@@ -128,18 +131,20 @@ class SensorObstacleNode:
 						tuple[1] * self.GRID_SIZE,
 						0
 					),
-										Point32(
+					Point32(
 						tuple[0] * self.GRID_SIZE,
 						(tuple[1]-1) * self.GRID_SIZE,
 						0
 					)
 				]
-					
-				self.cells_pub.publish(grid)
 
 			except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 				rospy.logerr("Transform failed: %s", str(e))
 		
 
 sensor_node = SensorObstacleNode()
-rospy.spin()
+rate = rospy.Rate(rospy.get_param('rate', 1.0))
+
+while not rospy.is_shutdown():
+	sensor_node.send()
+	rate.sleep()
