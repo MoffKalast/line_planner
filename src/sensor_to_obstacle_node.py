@@ -58,12 +58,16 @@ class SensorObstacleNode:
 		return grid
 
 	def send(self):
+
+		if len(self.message.cells) == 0:
+			return
+		
 		self.cells_pub.publish(self.message)
 		self.message = self.new_grid()
 
-	def transform_points(self, points, source_frame, target_frame):
+	def transform_points(self, points, header, target_frame):
 		try:
-			transform = self.tf2_buffer.lookup_transform(target_frame, source_frame, rospy.Time(0), rospy.Duration(1.0))
+			transform = self.tf2_buffer.lookup_transform(target_frame, header.frame_id, rospy.Time(0), rospy.Duration(1.0))
 		except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
 			rospy.logerr('Error finding transform: %s' % e)
 			return None
@@ -84,7 +88,7 @@ class SensorObstacleNode:
 				angle = msg.angle_min + index * msg.angle_increment
 				points.append((distance * math.cos(angle), distance * math.sin(angle), 0))
 			
-		world_points = self.transform_points(points, msg.header.frame_id, self.PLANNING_FRAME)
+		world_points = self.transform_points(points, msg.header, self.PLANNING_FRAME)
 
 		if world_points is None:
 			return
@@ -93,7 +97,7 @@ class SensorObstacleNode:
 			point = Point32()
 			point.x = x * self.GRID_SIZE
 			point.y = y * self.GRID_SIZE
-			self.message.cells.append(point)	
+			self.message.cells.append(point)
 
 	def range_callback(self, msg):
 		if msg.range < msg.max_range:

@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 generate_dynamic_reconfigure_options(
     config/LinePlanner.cfg
     config/AreaToPath.cfg
+    config/AltitudeController.cfg
 )
 
 catkin_package(
@@ -26,5 +27,6 @@ install(PROGRAMS
     src/line_planner_node.py
     src/area_to_path_node.py
     src/sensor_to_obstacle_node.py
+    src/altitude_controller.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
