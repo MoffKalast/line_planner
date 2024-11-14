@@ -9,6 +9,8 @@ from utils import *
 from navigator import Navigator
 from markers import DebugMarkers
 
+from rospy.exceptions import ROSTimeMovedBackwardsException
+
 from geometry_msgs.msg import Twist, PoseStamped
 from std_msgs.msg import Empty, Bool
 
@@ -401,5 +403,9 @@ rate = rospy.Rate(rospy.get_param('rate', 30))
 rospy.on_shutdown(ctrl.cleanup)
 
 while not rospy.is_shutdown():
-	ctrl.update()
-	rate.sleep()
+	try:
+		ctrl.update()
+		rate.sleep()
+	except ROSTimeMovedBackwardsException as e:
+		print(e)
+

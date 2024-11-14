@@ -12,6 +12,7 @@ from geometry_msgs.msg import PolygonStamped, Point32
 from nav_msgs.msg import GridCells
 from sensor_msgs.msg import Range, LaserScan
 from geometry_msgs.msg import PoseStamped, PolygonStamped, Point, PointStamped
+from rospy.exceptions import ROSTimeMovedBackwardsException
 
 from tf2_geometry_msgs import do_transform_point
 
@@ -150,5 +151,8 @@ sensor_node = SensorObstacleNode()
 rate = rospy.Rate(rospy.get_param('rate', 1.0))
 
 while not rospy.is_shutdown():
-	sensor_node.send()
-	rate.sleep()
+	try:
+		sensor_node.send()
+		rate.sleep()
+	except ROSTimeMovedBackwardsException as e:
+		print(e)
