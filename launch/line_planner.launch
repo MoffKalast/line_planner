@@ -1,44 +1,49 @@
 <launch>
 
+    <arg name="robot_frame" default="base_link" />
+    <arg name="planning_frame" default="map" />
+
     <node name="line_planner" pkg="line_planner" type="line_planner_node.py" output="screen">
 
-        <param name="robot_frame" value="base_link"/>
-        <param name="planning_frame" value="map"/>
+        <param name="robot_frame" value="$(arg robot_frame)"/>
+        <param name="planning_frame" value="$(arg planning_frame)"/>
 
         <param name="publish_debug_markers" value="true"/>
+        <param name="ignore_altitude" value="false"/>
 
-        <param name="max_turning_velocity" value="0.9"/>
-
-        <param name="linear_acceleration" value="0.05"/>
-        <param name="min_linear_velocity" value="0.15"/>
-        <param name="max_linear_velocity" value="0.45"/>
-        
+        <!--Speeds will be clamped to these values -->
+        <param name="max_linear_speed" value="1.0"/>
+        <param name="max_turning_speed" value="2.0"/>
+        <param name="max_vertical_speed" value="1.0"/>
 
         <!-- If base_link is this far away from the line, the projected distance will be min and scale to max when it's on the line.-->
         <param name="max_line_divergence" value="1.5"/>
 
-        <param name="min_project_dist" value="0.25"/>
-        <param name="max_project_dist" value="2.0"/>
+        <!-- If any obstacles are defined then line divergence + robot width are used for finding a suitably wide path.-->
+        <param name="robot_width" value="3.0"/>
+
+        <!-- Reduce min distance and increase max distance for smoother, but less accurate following.-->
+        <param name="min_project_dist" value="0.3"/>
+        <param name="max_project_dist" value="5.0"/>
 
         <!-- Distance at which the goal is considered reached.-->
-        <param name="goal_distance_threshold" value="1.0"/>
+        <param name="xy_distance_threshold" value="1.0"/>
+        <param name="z_distance_threshold" value="0.5"/>
 
-        <!-- PID params for heading control.-->
-        <param name="P" value="3.0"/>
-        <param name="I" value="0.001"/>
+        <!-- PID params for rotational heading control.-->
+        <param name="P" value="2.0"/>
+        <param name="I" value="0.002"/>
         <param name="D" value="65.0"/>
 
         <!-- If the robot frame is away from the line, the goal will be mirrored into the opposite direction and multiplied with this value.-->
-        <param name="side_offset_mult" value="0.5"/>
+        <param name="side_offset_mult" value="0.8"/>
 
         <!-- Update rate, should be about the same as localization rate.-->
         <param name="rate" value="30"/>
-
-        <!-- If we make no or negative progress for this long, the goal is aborted. (seconds)-->
-        <param name="abort_timeout" value="240.0"/>
-
     </node>
     
-    <node name="area_to_path_node" pkg="line_planner" type="area_to_path.py" output="screen"/>
+    <node name="area_to_path_node" pkg="line_planner" type="area_to_path_node.py" output="screen">
+        <param name="step_size" value="2.0"/>
+    </node>
 
 </launch>
