@@ -8,36 +8,41 @@ A local planner that takes two goals (last and next), and follows a projected go
 
 ## Params
 
-Note that min speed should be less or equal to max speed.
-
 ```xml
 <node name="line_planner" pkg="line_planner" type="line_planner_node.py" output="screen">
+	<param name="robot_frame" value="base_link"/>
+	<param name="planning_frame" value="map"/>
 
 	<param name="publish_debug_markers" value="true"/>
+	<param name="ignore_altitude" value="false"/> <!-- Won't bother with z values -->
 
-	<param name="max_turning_velocity" value="0.9"/>
-	<param name="max_linear_velocity" value="0.45"/>
+	<param name="max_linear_speed" value="3.0"/>
+	<param name="max_turning_speed" value="2.0"/>
+	<param name="max_vertical_speed" value="10.0"/>
 
 	<!-- If base_link is this far away from the line, the projected distance will be min and scale to max when it's on the line.-->
-	<param name="max_line_divergence" value="1.0"/>
+	<param name="max_line_divergence" value="1.5"/>
 
-	<param name="min_project_dist" value="0.15"/>
-	<param name="max_project_dist" value="1.2"/>
+	<!-- If any obstacles are defined then line divergence + robot width are used for finding a suitably wide path.-->
+	<param name="robot_width" value="3.0"/>
+
+	<param name="min_project_dist" value="0.3"/>
+	<param name="max_project_dist" value="5.0"/>
 
 	<!-- Distance at which the goal is considered reached.-->
-	<param name="goal_distance_threshold" value="0.6"/>
+	<param name="xy_distance_threshold" value="1.0"/>
+	<param name="z_distance_threshold" value="0.5"/>
 
 	<!-- PID params for heading control.-->
-	<param name="P" value="3.0"/>
-	<param name="I" value="0.001"/>
+	<param name="P" value="2.0"/>
+	<param name="I" value="0.002"/>
 	<param name="D" value="65.0"/>
+
+	<!-- If the robot frame is away from the line, the goal will be mirrored into the opposite direction and multiplied with this value.-->
+	<param name="side_offset_mult" value="0.8"/>
 
 	<!-- Update rate, should be about the same as localization rate.-->
 	<param name="rate" value="30"/>
-
-	<!-- If we make no or negative progress for this long, the goal is aborted. (seconds)-->
-	<param name="abort_timeout" value="30.0"/>
-
 </node>
 ```
 
@@ -56,23 +61,27 @@ Here's a diagram showing the possible states of the planner, and which distances
 
 ## Published Topics
 
-- `/cmd_vel` (JointState), publishes velocity for both wheels/tracks/propellers
+- `/cmd_vel` (Twist), publishes velocity for vehicle motion
 
-- `line_planner/active` (Bool), publishes the acitvity state of the planner
+- `line_planner/active` (Bool), publishes navigation status
 
 - `line_planner/plan` (Path), publishes a nav plan, also the entire route if given
 
 - `line_planner/markers` (MarkerArray), publishes debug markers shown above
 
+- `line_planner/vertical_target` (Float32), publishes the current altitude target
+
  ## Dynamic Reconfigure Params
 
 - `publish_debug_markers` (bool_t), if set to True, the node will publish markers for debugging purposes.
 
-- `max_turning_velocity` (double_t), the maximum velocity at which the robot can turn.
+- `ignore_altitude` (bool_t), if true, Z values will be disregarded.
 
-- `max_linear_velocity` (double_t), the maximum linear velocity of the robot.
+- `max_linear_speed` (double_t), the maximum linear speed of the robot.
 
-- `linear_acceleration` (double_t), the linear acceleration/deceleration of the robot.
+- `max_turning_speed` (double_t), the maximum speed at which the robot can turn.
+
+- `max_vertical_speed` (double_t), the maximum vertical speed of the robot.
 
 - `max_line_divergence` (double_t), the maximum distance that the robot can diverge from the line between the goals.
 
