@@ -46,7 +46,7 @@ def project_position(start, end, current, mindist, maxdist, line_divergence, sid
 	# Add the side vector for more aggressive tracking
 	additional_vector = -side_offset * (current_pos - projection)
 
-	return np_to_point(new_pos+ additional_vector)
+	return np_to_point(new_pos + additional_vector)
 
 def clamp(num, min, max):
 	return min if num < min else max if num > max else num

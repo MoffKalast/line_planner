@@ -6,11 +6,12 @@ import tf
 import tf2_ros
 
 from utils import *
+from markers import DebugMarkers
 
 from geometry_msgs.msg import Twist, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import Empty, ColorRGBA, Bool
+from std_msgs.msg import Empty, ColorRGBA, Bool, Float32
 
 from tf.transformations import euler_from_quaternion
 from tf2_geometry_msgs import do_transform_pose
@@ -34,6 +35,8 @@ class GoalServer:
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/waypoints", Path, self.route_callback)
 		self.simple_goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_callback)
 		self.clear_goals_sub = rospy.Subscriber("/move_base_simple/clear", Empty, self.reset)
+
+		self.vertical_pub = rospy.Publisher("line_planner/vertical_target", Float32, queue_size=1)
 
 		self.start_goal = None
 		self.end_goal = None
@@ -98,6 +101,10 @@ class GoalServer:
 			self.start_goal = self.end_goal
 			self.end_goal = endgoal
 
+		vert_msg = Float32()
+		vert_msg.data = self.end_goal.position.z
+		self.vertical_pub.publish(vert_msg)
+
 		self.update_plan()
 
 	def process_goal(self, goal):
@@ -129,13 +136,12 @@ class LineFollowingController:
 		ROBOT_FRAME = rospy.get_param('~robot_frame', 'base_link')
 		PLANNING_FRAME = rospy.get_param('~planning_frame', 'map')
 		
-		self.MIN_GOAL_DIST = rospy.get_param('~goal_distance_threshold', 0.6)
+		self.MIN_GOAL_XY_DIST = rospy.get_param('~xy_distance_threshold', 0.5)
+		self.MIN_GOAL_Z_DIST = rospy.get_param('~z_distance_threshold', 0.5)
 
-		self.MAX_ANGULAR_SPD = rospy.get_param('~max_turning_velocity', 0.9)
-
-		self.LINEAR_ACCEL = rospy.get_param('~linear_acceleration', 0.1)
-		self.MIN_LINEAR_SPD = rospy.get_param('~min_linear_velocity', 0.1)
-		self.MAX_LINEAR_SPD = rospy.get_param('max_linear_velocity', 0.45)
+		self.MAX_LINEAR_SPD = rospy.get_param('~max_linear_speed', 0.45)
+		self.MAX_VERTICAL_SPD = rospy.get_param('~max_vertical_speed', 0.5)
+		self.MAX_ANGULAR_SPD = rospy.get_param('~max_turning_speed', 0.9)
 
 		self.LINE_DIVERGENCE = rospy.get_param('~max_line_divergence', 1.0)
 		self.MIN_PROJECT_DIST = rospy.get_param('~min_project_dist', 0.15)
@@ -143,7 +149,10 @@ class LineFollowingController:
 
 		self.SIDE_OFFSET_MULT = rospy.get_param('~side_offset_mult', 0.5)
 
+		self.IGNORE_ALTITUDE = rospy.get_param('~ignore_altitude', False)
+
 		self.DEBUG_MARKERS = rospy.get_param('~publish_debug_markers', True)
+		self.markers = DebugMarkers(PLANNING_FRAME)
 
 		self.tf_listener = tf.TransformListener()
 
@@ -157,6 +166,12 @@ class LineFollowingController:
 		self.marker_pub = rospy.Publisher("line_planner/markers", MarkerArray, queue_size=1)
 
 		self.pid = PID(
+			rospy.get_param('P', 3.0),
+			rospy.get_param('I', 0.001), 
+			rospy.get_param('D', 65.0)
+		)
+
+		self.pid_vert = PID(
 			rospy.get_param('P', 3.0),
 			rospy.get_param('I', 0.001), 
 			rospy.get_param('D', 65.0)
@@ -179,19 +194,23 @@ class LineFollowingController:
 		self.pid.ki = config.I
 		self.pid.kd = config.D
 
-		self.MIN_GOAL_DIST = config.goal_distance_threshold
+		self.pid_vert.kp = config.P
+		self.pid_vert.ki = config.I
+		self.pid_vert.kd = config.D
 
-		self.LINEAR_ACCEL = config.linear_acceleration
-		self.MAX_LINEAR_SPD = config.max_linear_velocity
+		self.MIN_GOAL_XY_DIST = config.xy_distance_threshold
+		self.MIN_GOAL_Z_DIST = config.z_distance_threshold
 
-		self.MAX_ANGULAR_SPD = config.max_turning_velocity
-		self.MAX_LINEAR_SPD = config.max_linear_velocity
+		self.MAX_LINEAR_SPD = config.max_linear_speed
+		self.MAX_ANGULAR_SPD = config.max_turning_speed
+		self.MAX_VERTICAL_SPD = config.max_vertical_speed
 
 		self.LINE_DIVERGENCE = config.max_line_divergence
 		self.MIN_PROJECT_DIST = config.min_project_dist
 		self.MAX_PROJECT_DIST = config.max_project_dist
 
 		self.DEBUG_MARKERS = config.publish_debug_markers
+		self.IGNORE_ALTITUDE = config.ignore_altitude
 
 		return config
 
@@ -231,6 +250,9 @@ class LineFollowingController:
 		
 		if abserr > 0.52:
 			vel *= clamp((-1.0 / 0.52) * abserr + 2, 0.0, 1.0) # gradually decrease velocity from 30 to 60 deg heading
+
+		if distance < self.MIN_GOAL_XY_DIST:
+			vel *= 0.1#distance/self.MIN_GOAL_XY_DIST
 		
 		return clamp(vel, 0.0, self.MAX_LINEAR_SPD)
 
@@ -239,13 +261,8 @@ class LineFollowingController:
 		start_goal, end_goal = self.goal_server.get_goals()
 
 		if start_goal == None or end_goal == None:
-
 			if self.active:
-				self.send_twist(0, 0)
-				if self.DEBUG_MARKERS:
-					self.delete_debug_markers()
-				self.active = False
-				self.status_pub.publish(False)
+				self.reset()
 			return
 		
 		try:
@@ -266,18 +283,25 @@ class LineFollowingController:
 			angle_error = self.get_angle_error(pose, target_position)
 			angular_velocity = clamp(self.pid.compute(angle_error), -self.MAX_ANGULAR_SPD, self.MAX_ANGULAR_SPD)
 			target_distance = self.get_distance(end_goal, pose)
+			linear_velocity = self.get_linear_velocity(target_distance, angle_error)
 
-			if target_distance > self.MIN_GOAL_DIST:
-				linear_velocity = self.get_linear_velocity(target_distance, angle_error)
+			vertical_error = pose.position.z - end_goal.position.z
+			vertical_velocity = clamp(self.pid_vert.compute(vertical_error), -self.MAX_VERTICAL_SPD, self.MAX_VERTICAL_SPD)
+				
+			if target_distance > self.MIN_GOAL_XY_DIST:
+				pass
+			elif math.fabs(vertical_error) > self.MIN_GOAL_Z_DIST and not self.IGNORE_ALTITUDE:
+				angular_velocity = 0
 			else:
 				linear_velocity = 0
 				angular_velocity = 0
+				vertical_velocity = 0
 				self.goal_server.goal_reached()
 
-			self.send_twist(linear_velocity, angular_velocity)
+			self.send_twist(linear_velocity, angular_velocity, vertical_velocity)
 
 			if self.DEBUG_MARKERS:
-				self.draw_debug_markers(target_position, start_goal, end_goal)
+				self.markers.draw_debug_markers(target_position, start_goal, end_goal, self.MIN_GOAL_XY_DIST, self.LINE_DIVERGENCE)
 
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 			rospy.logwarn("TF Exception")
@@ -309,86 +333,38 @@ class LineFollowingController:
 
 		self.plan_pub.publish(msg)
 
-	def send_twist(self, vel_x, vel_z):
+	def send_twist(self, linear, angular, vert):
 
 		#sanity check, just in case
-		if math.isnan(vel_x):
-			vel_x = 0
+		if math.isnan(linear):
+			linear = 0
 
-		if math.isnan(vel_z):
-			vel_z = 0
+		if math.isnan(angular):
+			angular = 0
+
+		if self.IGNORE_ALTITUDE or math.isnan(vert):
+			vert = 0
 
 		twist = Twist()
-		twist.linear.x = vel_x
-		twist.angular.z = vel_z
+		twist.linear.x = linear
+		twist.linear.z = vert
+		twist.angular.z = angular
 		self.cmd_vel_pub.publish(twist)
 
-	def cleanup(self):
-		self.send_twist(0,0)
-		self.delete_debug_markers()
+	def reset(self):
+		self.send_twist(0, 0, 0)
 
-	def delete_debug_markers(self):
+		if self.DEBUG_MARKERS:
+			self.markers.delete_debug_markers()
 
-		marker = Marker()
-		marker.action = 3
-
-		markerArray = MarkerArray()
-		markerArray.markers.append(marker)
-		self.marker_pub.publish(markerArray)
-
-	def draw_debug_markers(self, target_position, start_goal, end_goal):
-		
-		def sphere_marker(position, marker_id, r, g, b, size):
-			marker = Marker()
-			marker.header.frame_id = PLANNING_FRAME
-			marker.type = Marker.SPHERE
-			marker.pose.position = position
-			marker.pose.orientation.w = 1.0
-			marker.scale.x = size
-			marker.scale.y = size
-			marker.scale.z = size
-			marker.color.a = 0.5
-			marker.color.r = r
-			marker.color.g = g
-			marker.color.b = b
-			marker.id = marker_id
-			return marker
-		
-		def line_marker(p_from, p_to, marker_id, r, g, b):
-			marker = Marker()
-			marker.header.frame_id = PLANNING_FRAME
-			marker.type = Marker.LINE_STRIP
-			marker.pose.orientation.w = 1.0
-
-			marker.points = [
-				Point(p_from.x, p_from.y, p_from.z),
-				Point(p_to.x, p_to.y, p_to.z),
-			]
-
-			c = ColorRGBA(r,g,b, 1.0)
-
-			marker.colors = [c, c]
-
-			marker.scale.x = 0.05
-			marker.id = marker_id
-			return marker
-
-		# to avoid flooding
-		if self.marker_publish_skip == 0:
-			markerArray = MarkerArray()
-			markerArray.markers.append(line_marker(start_goal.position, end_goal.position, 0, 0.575, 0.870, 0.0261))
-			markerArray.markers.append(sphere_marker(start_goal.position, 1, 1.0, 0.0, 0.0, 0.2))
-			markerArray.markers.append(sphere_marker(end_goal.position, 2, 0.0, 0.0, 1.0, self.MIN_GOAL_DIST*2))
-			markerArray.markers.append(sphere_marker(target_position, 3, 0.0, 1.0, 0.0, 0.2))
-			self.marker_pub.publish(markerArray)
-		
-		self.marker_publish_skip = (self.marker_publish_skip +1)%5
-
-
+		self.active = False
+		self.status_pub.publish(False)
+		self.pid.reset()
+		self.pid_vert.reset()
 
 ctrl = LineFollowingController()
 rate = rospy.Rate(rospy.get_param('rate', 30))
-rospy.on_shutdown(ctrl.cleanup)
+rospy.on_shutdown(ctrl.reset)
 
 while not rospy.is_shutdown():
 	ctrl.update()
