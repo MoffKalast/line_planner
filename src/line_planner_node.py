@@ -209,6 +209,8 @@ class LineFollowingController:
 		self.MIN_PROJECT_DIST = config.min_project_dist
 		self.MAX_PROJECT_DIST = config.max_project_dist
 
+		self.SIDE_OFFSET_MULT = config.side_offset_mult
+
 		self.DEBUG_MARKERS = config.publish_debug_markers
 		self.IGNORE_ALTITUDE = config.ignore_altitude
 
@@ -222,16 +224,14 @@ class LineFollowingController:
 			current_pose.orientation.w,
 		])
 
-		target_unit_vector = get_dir(current_pose.position, target_position)
-		current_unit_vector = [math.cos(current_yaw), math.sin(current_yaw)]
+		delta_x = target_position.x - current_pose.position.x
+		delta_y = target_position.y - current_pose.position.y
+		target_yaw = math.atan2(delta_y, delta_x)
 
-		#get the angle cosine
-		dot_product = target_unit_vector[0] * current_unit_vector[0] + target_unit_vector[1] * current_unit_vector[1]
-		
-		#get the direction
-		cross_product = current_unit_vector[0] * target_unit_vector[1] - current_unit_vector[1] * target_unit_vector[0]
+		angle_error = target_yaw - current_yaw
+		angle_error = -math.atan2(math.sin(angle_error), math.cos(angle_error))
 
-		return -math.copysign(math.acos(dot_product), cross_product)
+		return angle_error
 
 	def get_distance(self, pose, goal):
 		deltax = goal.position.x - pose.position.x
@@ -239,22 +239,36 @@ class LineFollowingController:
 		return math.sqrt(deltax** 2 + deltay ** 2)
 
 	def get_linear_velocity(self, distance, angle_error):
-		vel = self.MAX_LINEAR_SPD
+		ANGLE_40_RAD = math.radians(40)
+		ANGLE_60_RAD = math.radians(60)
+		ANGLE_120_RAD = math.radians(120)
+		ANGLE_140_RAD = math.radians(140)
 
-		# check for correct orientation
-		abserr = math.fabs(angle_error)
+		abs_angle_error = math.fabs(angle_error)
+		vel_multiplier = 0.0
 
-		if abserr > 2.0:
-			vel *= clamp(-1.598 * abserr + 3.196, -1.0, 0.0) # gradually reverse from 120 to 180 deg heading
-			return clamp(vel, -self.MAX_LINEAR_SPD, 0.0)
-		
-		if abserr > 0.52:
-			vel *= clamp((-1.0 / 0.52) * abserr + 2, 0.0, 1.0) # gradually decrease velocity from 30 to 60 deg heading
+		if abs_angle_error <= ANGLE_40_RAD:
+			# Full speed ahead
+			vel_multiplier = 1.0
+		elif abs_angle_error <= ANGLE_60_RAD:
+			# Linearly decrease speed from 100% at 30 deg to 0% at 60 deg.
+			scale = (abs_angle_error - ANGLE_40_RAD) / (ANGLE_60_RAD - ANGLE_40_RAD)
+			vel_multiplier = 1.0 - scale
+		elif abs_angle_error <= ANGLE_120_RAD:
+			# Turn in place between 60 and 120 deg
+			vel_multiplier = 0.0
+		elif abs_angle_error <= ANGLE_140_RAD:
+			# Reverse from 0% at 120 deg to -100% at 180 deg for J turn behaviour.
+			scale = (abs_angle_error - ANGLE_120_RAD) / (ANGLE_140_RAD - ANGLE_120_RAD)
+			vel_multiplier = -scale
 
+		linear_vel = self.MAX_LINEAR_SPD * vel_multiplier
+
+		# Slow down while waiting for depth to match
 		if distance < self.MIN_GOAL_XY_DIST:
-			vel *= 0.1#distance/self.MIN_GOAL_XY_DIST
-		
-		return clamp(vel, 0.0, self.MAX_LINEAR_SPD)
+			linear_vel *= 0.1
+
+		return max(-self.MAX_LINEAR_SPD, min(linear_vel, self.MAX_LINEAR_SPD))
 
 
 	def update(self):
